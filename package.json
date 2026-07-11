@@ -1,0 +1,83 @@
+{
+  "name": "easyrequest",
+  "displayName": "EasyRequest",
+  "description": "Cliente HTTP nativo de VS Code con descubrimiento de APIs.",
+  "version": "0.1.0",
+  "publisher": "easyrequest",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCustomEditor:easyrequest.editor",
+    "onCommand:easyrequest.newCollection"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "customEditors": [
+      {
+        "viewType": "easyrequest.editor",
+        "displayName": "EasyRequest",
+        "selector": [
+          {
+            "filenamePattern": "*.erequest"
+          }
+        ],
+        "priority": "default"
+      }
+    ],
+    "commands": [
+      {
+        "command": "easyrequest.newCollection",
+        "title": "EasyRequest: Nueva colección"
+      }
+    ],
+    "configuration": {
+      "title": "EasyRequest",
+      "properties": {
+        "easyrequest.requestTimeoutMs": {
+          "type": "number",
+          "default": 30000,
+          "minimum": 1000,
+          "description": "Tiempo máximo de espera para una petición HTTP."
+        },
+        "easyrequest.maxBatchRequests": {
+          "type": "number",
+          "default": 100,
+          "minimum": 1,
+          "description": "Máximo de solicitudes que puede lanzar una ráfaga."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "build": "npm run build:extension && npm run build:webview",
+    "build:extension": "tsc -p .",
+    "build:webview": "vite build --config webview/vite.config.ts",
+    "watch": "concurrently -k \"npm:watch:extension\" \"npm:watch:webview\"",
+    "watch:extension": "tsc -watch -p .",
+    "watch:webview": "vite build --watch --config webview/vite.config.ts",
+    "lint": "tsc -p . --noEmit && tsc -p webview/tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@monaco-editor/react": "^4.6.0",
+    "@vscode/webview-ui-toolkit": "^1.4.0",
+    "p-limit": "^3.1.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.10",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@types/vscode": "^1.85.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "concurrently": "^8.2.2",
+    "typescript": "^5.5.4",
+    "vite": "^5.3.4"
+  }
+}

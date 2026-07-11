@@ -1,0 +1,66 @@
+import { useEffect, useMemo, useState } from "react";
+import Editor from "@monaco-editor/react";
+import type { BatchResult, HttpResult } from "../../../src/types";
+
+interface ResponsePanelProps {
+  batch?: BatchResult;
+}
+
+export function ResponsePanel({ batch }: ResponsePanelProps): JSX.Element {
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  useEffect(() => setSelectedIndex(0), [batch]);
+  const selected = batch?.results[selectedIndex];
+  const successCount = batch?.results.filter((result) => result.ok).length ?? 0;
+
+  return (
+    <aside className="response-panel">
+      <div className="pane-heading">Respuesta</div>
+      {!batch ? (
+        <div className="response-empty">Envía una petición para inspeccionar la respuesta y las métricas de la ráfaga.</div>
+      ) : (
+        <>
+          <div className="batch-summary">
+            <strong>{successCount}/{batch.results.length}</strong> correctas
+            <span>{batch.totalDurationMs} ms total</span>
+          </div>
+          <div className="batch-results" aria-label="Resultados de la ráfaga">
+            {batch.results.map((result) => (
+              <button key={result.index} className={selectedIndex === result.index ? "selected" : ""} onClick={() => setSelectedIndex(result.index)}>
+                <span>#{result.index + 1}</span>
+                <span className={`status ${result.ok ? "success" : "failure"}`}>{result.status ?? "ERR"}</span>
+                <span>{result.durationMs} ms</span>
+              </button>
+            ))}
+          </div>
+          {selected && <ResponseDetails result={selected} />}
+        </>
+      )}
+    </aside>
+  );
+}
+
+function ResponseDetails({ result }: { result: HttpResult }): JSX.Element {
+  const responseBody = useMemo(() => formatBody(result.body), [result.body]);
+  const headers = Object.entries(result.headers).map(([key, value]) => `${key}: ${value}`).join("\n");
+  return (
+    <div className="response-details">
+      <div className="response-meta">
+        <span className={`status ${result.ok ? "success" : "failure"}`}>{result.status ?? "Error"} {result.statusText}</span>
+        <span>{result.durationMs} ms</span>
+      </div>
+      {result.error ? <pre className="request-error">{result.error}</pre> : <Editor height="220px" language="json" value={responseBody} theme="vs-dark" options={{ readOnly: true, minimap: { enabled: false }, fontSize: 12, wordWrap: "on", scrollBeyondLastLine: false }} />}
+      {!!headers && <details className="response-headers"><summary>Headers de respuesta</summary><pre>{headers}</pre></details>}
+    </div>
+  );
+}
+
+function formatBody(body: string): string {
+  if (!body) {
+    return "(sin contenido)";
+  }
+  try {
+    return JSON.stringify(JSON.parse(body), null, 2);
+  } catch {
+    return body;
+  }
+}
