@@ -8,14 +8,26 @@ type OpenApiDocument = {
   host?: string;
   basePath?: string;
   schemes?: string[];
-  paths?: Record<string, Record<string, OpenApiOperation>>;
+  paths?: Record<string, OpenApiPathItem>;
+};
+
+type OpenApiPathItem = {
+  parameters?: OpenApiParameter[];
+  [key: string]: OpenApiOperation | OpenApiParameter[] | undefined;
+};
+
+type OpenApiParameter = {
+  name?: string;
+  in?: string;
+  example?: unknown;
+  schema?: { example?: unknown };
 };
 
 type OpenApiOperation = {
   tags?: string[];
   summary?: string;
   operationId?: string;
-  parameters?: Array<{ name?: string; in?: string; example?: unknown; schema?: { example?: unknown } }>;
+  parameters?: OpenApiParameter[];
   requestBody?: {
     content?: Record<string, { example?: unknown; schema?: { example?: unknown; default?: unknown } }>;
   };
@@ -50,13 +62,20 @@ export class SwaggerStrategy implements IDiscoveryStrategy {
     Object.entries(spec.paths ?? {}).forEach(([path, operations]) => {
       Object.entries(operations).forEach(([verb, operation]) => {
         const method = verb.toUpperCase() as HttpMethod;
-        if (!METHODS.includes(method) || !operation) {
+        if (!METHODS.includes(method) || !this.isOperation(operation)) {
           return;
         }
         const group = operation.tags?.[0] ?? "Sin etiqueta";
         const route = path.replace(/\{([^}]+)\}/g, "{{$1}}");
         const id = `${method}:${path}`;
-        const request = this.makeRequest(id, operation.summary ?? operation.operationId ?? `${method} ${path}`, method, `${baseUrl}${route}`, operation);
+        const request = this.makeRequest(
+          id,
+          operation.summary ?? operation.operationId ?? `${method} ${path}`,
+          method,
+          `${baseUrl}${route}`,
+          operation,
+          operations.parameters ?? []
+        );
         endpoints.push({ id, group, name: request.name, method, path, request });
       });
     });
@@ -64,13 +83,27 @@ export class SwaggerStrategy implements IDiscoveryStrategy {
     return endpoints.sort((left, right) => left.group.localeCompare(right.group) || left.path.localeCompare(right.path));
   }
 
-  private makeRequest(id: string, name: string, method: HttpMethod, url: string, operation: OpenApiOperation): RequestSpec {
-    const params = (operation.parameters ?? [])
-      .filter((parameter) => parameter.in === "query")
+  private makeRequest(
+    id: string,
+    name: string,
+    method: HttpMethod,
+    url: string,
+    operation: OpenApiOperation,
+    pathParameters: OpenApiParameter[]
+  ): RequestSpec {
+    const mergedParameters = new Map<string, OpenApiParameter>();
+    [...pathParameters, ...(operation.parameters ?? [])].forEach((parameter) => {
+      if (parameter.name && (parameter.in === "path" || parameter.in === "query")) {
+        mergedParameters.set(`${parameter.in}:${parameter.name}`, parameter);
+      }
+    });
+    const params = [...mergedParameters.values()]
+      .filter((parameter) => parameter.in === "path" || parameter.in === "query")
       .map((parameter) => ({
         key: parameter.name ?? "",
         value: String(parameter.example ?? parameter.schema?.example ?? ""),
-        enabled: false
+        enabled: parameter.in === "path",
+        location: parameter.in === "path" ? "path" as const : "query" as const
       }));
     const media = operation.requestBody?.content?.["application/json"];
     const example = media?.example ?? media?.schema?.example ?? media?.schema?.default;
@@ -102,5 +135,9 @@ export class SwaggerStrategy implements IDiscoveryStrategy {
     }
     const source = new URL(this.swaggerUrl);
     return source.origin;
+  }
+
+  private isOperation(value: OpenApiOperation | OpenApiParameter[] | undefined): value is OpenApiOperation {
+    return Boolean(value) && !Array.isArray(value);
   }
 }

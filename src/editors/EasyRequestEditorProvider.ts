@@ -125,6 +125,11 @@ export class EasyRequestEditorProvider implements vscode.CustomTextEditorProvide
       });
     }
     const batch = await this.httpService.executeBatch(resolved, message.total ?? 1, message.concurrency ?? 1);
+    const requestedTotal = Math.max(1, Math.floor(message.total ?? 1));
+    if (batch.results.length < requestedTotal) {
+      const maximum = vscode.workspace.getConfiguration("easyrequest").get<number>("maxBatchRequests", 100);
+      this.post(webview, { type: "warning", message: `La ráfaga se limitó a ${maximum} solicitudes.` });
+    }
     this.post(webview, { type: "batchResult", batch });
   }
 

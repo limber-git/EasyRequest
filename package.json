@@ -61,7 +61,8 @@
     "watch": "concurrently -k \"npm:watch:extension\" \"npm:watch:webview\"",
     "watch:extension": "tsc -watch -p .",
     "watch:webview": "vite build --watch --config webview/vite.config.ts",
-    "lint": "tsc -p . --noEmit && tsc -p webview/tsconfig.json --noEmit"
+    "lint": "tsc -p . --noEmit && tsc -p webview/tsconfig.json --noEmit",
+    "test": "npm run build:extension && node --test out/test/EnvResolver.test.js"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.6.0",

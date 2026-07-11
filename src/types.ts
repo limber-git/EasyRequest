@@ -4,6 +4,8 @@ export interface KeyValue {
   key: string;
   value: string;
   enabled: boolean;
+  /** Path parameters substitute a {{token}} in the URL instead of becoming a query string. */
+  location?: "path" | "query";
 }
 
 export interface RequestSpec {

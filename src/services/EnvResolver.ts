@@ -10,14 +10,20 @@ export interface ResolvedRequest extends Omit<RequestSpec, "headers" | "params">
 export class EnvResolver {
   public resolveRequest(request: RequestSpec, variables: Record<string, string>): ResolvedRequest {
     const missing = new Set<string>();
-    const resolve = (value: string) => this.resolveString(value, variables, missing);
+    const parameterVariables = this.resolveParameterVariables(request.params, variables, missing);
+    const effectiveVariables = { ...variables, ...parameterVariables };
+    const resolve = (value: string) => this.resolveString(value, effectiveVariables, missing);
 
     return {
       ...request,
       url: resolve(request.url),
       body: resolve(request.body),
       headers: this.resolveEntries(request.headers, resolve),
-      params: this.resolveEntries(request.params, resolve),
+      params: this.resolveEntries(
+        request.params,
+        resolve,
+        (key, entry) => entry.location !== "path" && !this.isRouteToken(request.url, key)
+      ),
       missingVariables: [...missing]
     };
   }
@@ -32,12 +38,38 @@ export class EnvResolver {
     });
   }
 
-  private resolveEntries(entries: KeyValue[], resolve: (value: string) => string): Record<string, string> {
+  private resolveParameterVariables(
+    entries: KeyValue[],
+    variables: Record<string, string>,
+    missing: Set<string>
+  ): Record<string, string> {
     return entries.reduce<Record<string, string>>((result, entry) => {
       if (entry.enabled && entry.key.trim()) {
-        result[resolve(entry.key).trim()] = resolve(entry.value);
+        const key = this.resolveString(entry.key, variables, missing).trim();
+        result[key] = this.resolveString(entry.value, variables, missing);
       }
       return result;
     }, {});
+  }
+
+  private resolveEntries(
+    entries: KeyValue[],
+    resolve: (value: string) => string,
+    include: (key: string, entry: KeyValue) => boolean = () => true
+  ): Record<string, string> {
+    return entries.reduce<Record<string, string>>((result, entry) => {
+      if (entry.enabled && entry.key.trim()) {
+        const key = resolve(entry.key).trim();
+        if (include(key, entry)) {
+          result[key] = resolve(entry.value);
+        }
+      }
+      return result;
+    }, {});
+  }
+
+  private isRouteToken(url: string, key: string): boolean {
+    const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(`{{\\s*${escapedKey}\\s*}}`).test(url);
   }
 }

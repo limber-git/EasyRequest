@@ -83,6 +83,12 @@ export class DotNetStaticStrategy implements IDiscoveryStrategy {
   private endpoint(method: HttpMethod, path: string, group: string, name: string): Endpoint {
     const normalizedPath = path.startsWith("/") ? path : `/${path}`;
     const templated = normalizedPath.replace(/\{([^}:]+)(?::[^}]+)?\}/g, "{{$1}}");
+    const params = [...normalizedPath.matchAll(/\{([^}:]+)(?::[^}]+)?\}/g)].map((match) => ({
+      key: match[1],
+      value: "",
+      enabled: true,
+      location: "path" as const
+    }));
     const id = `${method}:${normalizedPath}`;
     const request: RequestSpec = {
       id,
@@ -90,7 +96,7 @@ export class DotNetStaticStrategy implements IDiscoveryStrategy {
       method,
       url: templated,
       headers: [],
-      params: [],
+      params,
       body: "",
       bodyType: "none",
       group
