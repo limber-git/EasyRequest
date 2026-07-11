@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import Editor from "@monaco-editor/react";
 import type { BatchResult, HttpResult } from "../../../src/types";
 
 interface ResponsePanelProps {
@@ -48,7 +47,11 @@ function ResponseDetails({ result }: { result: HttpResult }): JSX.Element {
         <span className={`status ${result.ok ? "success" : "failure"}`}>{result.status ?? "Error"} {result.statusText}</span>
         <span>{result.durationMs} ms</span>
       </div>
-      {result.error ? <pre className="request-error">{result.error}</pre> : <Editor height="220px" language="json" value={responseBody} theme="vs-dark" options={{ readOnly: true, minimap: { enabled: false }, fontSize: 12, wordWrap: "on", scrollBeyondLastLine: false }} />}
+      {result.error ? (
+        <pre className="request-error">{result.error}</pre>
+      ) : (
+        <pre className="response-body" tabIndex={0} aria-label="Body de respuesta JSON">{responseBody}</pre>
+      )}
       {!!headers && <details className="response-headers"><summary>Headers de respuesta</summary><pre>{headers}</pre></details>}
     </div>
   );
