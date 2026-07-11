@@ -33,6 +33,7 @@ export function EnvironmentEditor({ environments, selectedId, onSelect, onChange
             </option>
           ))}
         </select>
+        <span className="environment-toggle">Variables</span>
       </summary>
       <div className="environment-popover">
         <div className="environment-title">

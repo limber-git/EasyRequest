@@ -10,7 +10,7 @@ type HostMessage =
   | { type: "document"; document: EasyRequestDocument }
   | { type: "batchResult"; batch: BatchResult }
   | { type: "error" | "warning"; message: string }
-  | { type: "discoveryComplete"; source: string; count: number; warning?: string };
+  | { type: "discoveryComplete"; source: string; count: number; baseUrl?: string; warning?: string };
 
 const createInitialDocument = (): EasyRequestDocument => ({
   version: 1,
@@ -68,7 +68,8 @@ export function App(): JSX.Element {
       } else if (message.type === "batchResult") {
         setBatch(message.batch);
       } else if (message.type === "discoveryComplete") {
-        setNotice(`${message.count} endpoints cargados desde ${message.source}.${message.warning ? ` ${message.warning}` : ""}`);
+        const origin = message.baseUrl ? ` Origen guardado: {{apiUrl}} = ${message.baseUrl}.` : "";
+        setNotice(`${message.count} endpoints cargados desde ${message.source}.${origin}${message.warning ? ` ${message.warning}` : ""}`);
       } else if (message.type === "error" || message.type === "warning") {
         setNotice(message.message);
       }
@@ -84,13 +85,16 @@ export function App(): JSX.Element {
   }, [vscode]);
 
   const activeRequest = document.requests.find((request) => request.id === activeRequestId) ?? document.requests[0];
-  const selectRequest = (request: RequestSpec) => {
+  const selectRequest = (request: RequestSpec, source: "collection" | "discovery") => {
     setActiveRequestId(request.id);
     updateDocument((current) => ({
       ...current,
-      requests: current.requests.some((item) => item.id === request.id)
-        ? current.requests
-        : [...current.requests, { ...request, headers: [...request.headers], params: [...request.params] }]
+      requests: source === "discovery"
+        ? [
+          ...current.requests.filter((item) => item.id !== request.id),
+          { ...request, headers: [...request.headers], params: [...request.params] }
+        ]
+        : current.requests
     }));
   };
   const updateRequest = (request: RequestSpec) => {

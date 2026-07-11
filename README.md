@@ -79,6 +79,11 @@ Los cambios realizados en la interfaz se guardan directamente en el archivo.
 Los valores de un entorno forman parte de dicho archivo, por lo que no debes
 incluir tokens, contraseñas ni otros secretos en colecciones compartidas.
 
+Para editar los valores, abre **Variables** junto al selector de entorno en la
+esquina superior derecha. Por ejemplo, una petición con
+`{{apiUrl}}/api/requests` usará el valor `http://localhost:5025` si esa es la
+URL configurada para `apiUrl` en el entorno seleccionado.
+
 ## Variables y peticiones
 
 EasyRequest sustituye únicamente tokens literales con la forma
@@ -106,8 +111,16 @@ la ejecución.
 Introduce la URL del documento, por ejemplo
 `https://localhost:7001/swagger/v1/swagger.json`, y pulsa **Sincronizar**.
 EasyRequest agrupa las operaciones por tag/controlador, conserva el verbo HTTP
-y crea una petición inicial con parámetros y ejemplos JSON cuando el documento
-los proporciona.
+y crea una petición inicial con parámetros y un body JSON. Si el documento no
+incluye ejemplos, genera un body editable a partir del esquema, incluso cuando
+este referencia `components/schemas` (OpenAPI 3) o `definitions` (Swagger 2).
+
+Al sincronizar, EasyRequest detecta el origen del documento y lo guarda en la
+variable `apiUrl` del entorno seleccionado. Las peticiones importadas quedan
+con la forma `{{apiUrl}}/ruta`, de modo que el puerto se cambia una sola vez en
+**Variables**. Por ejemplo, sincronizar
+`http://localhost:5025/swagger/v1/swagger.json` configura
+`apiUrl = http://localhost:5025`.
 
 Si Swagger no está disponible, la sincronización intenta automáticamente el
 análisis del espacio de trabajo C# y, como último recurso, conserva el último

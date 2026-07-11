@@ -9,6 +9,8 @@ type OpenApiDocument = {
   basePath?: string;
   schemes?: string[];
   paths?: Record<string, OpenApiPathItem>;
+  components?: { schemas?: Record<string, OpenApiSchema> };
+  definitions?: Record<string, OpenApiSchema>;
 };
 
 type OpenApiPathItem = {
@@ -20,7 +22,27 @@ type OpenApiParameter = {
   name?: string;
   in?: string;
   example?: unknown;
-  schema?: { example?: unknown };
+  schema?: OpenApiSchema;
+};
+
+type OpenApiSchema = {
+  $ref?: string;
+  type?: string;
+  format?: string;
+  properties?: Record<string, OpenApiSchema>;
+  items?: OpenApiSchema;
+  example?: unknown;
+  default?: unknown;
+  enum?: unknown[];
+  allOf?: OpenApiSchema[];
+  oneOf?: OpenApiSchema[];
+  anyOf?: OpenApiSchema[];
+};
+
+type OpenApiMedia = {
+  example?: unknown;
+  examples?: Record<string, { value?: unknown }>;
+  schema?: OpenApiSchema;
 };
 
 type OpenApiOperation = {
@@ -29,7 +51,7 @@ type OpenApiOperation = {
   operationId?: string;
   parameters?: OpenApiParameter[];
   requestBody?: {
-    content?: Record<string, { example?: unknown; schema?: { example?: unknown; default?: unknown } }>;
+    content?: Record<string, OpenApiMedia>;
   };
 };
 
@@ -49,14 +71,13 @@ export class SwaggerStrategy implements IDiscoveryStrategy {
         throw new Error("El documento no contiene un objeto 'paths'.");
       }
 
-      return { source: "swagger", endpoints: this.toEndpoints(spec) };
+      return { source: "swagger", baseUrl: this.baseUrl(spec), endpoints: this.toEndpoints(spec) };
     } finally {
       clearTimeout(timeout);
     }
   }
 
   private toEndpoints(spec: OpenApiDocument): Endpoint[] {
-    const baseUrl = this.baseUrl(spec);
     const endpoints: Endpoint[] = [];
 
     Object.entries(spec.paths ?? {}).forEach(([path, operations]) => {
@@ -72,9 +93,10 @@ export class SwaggerStrategy implements IDiscoveryStrategy {
           id,
           operation.summary ?? operation.operationId ?? `${method} ${path}`,
           method,
-          `${baseUrl}${route}`,
+          `{{apiUrl}}${route}`,
           operation,
-          operations.parameters ?? []
+          operations.parameters ?? [],
+          spec
         );
         endpoints.push({ id, group, name: request.name, method, path, request });
       });
@@ -89,7 +111,8 @@ export class SwaggerStrategy implements IDiscoveryStrategy {
     method: HttpMethod,
     url: string,
     operation: OpenApiOperation,
-    pathParameters: OpenApiParameter[]
+    pathParameters: OpenApiParameter[],
+    spec: OpenApiDocument
   ): RequestSpec {
     const mergedParameters = new Map<string, OpenApiParameter>();
     [...pathParameters, ...(operation.parameters ?? [])].forEach((parameter) => {
@@ -101,12 +124,11 @@ export class SwaggerStrategy implements IDiscoveryStrategy {
       .filter((parameter) => parameter.in === "path" || parameter.in === "query")
       .map((parameter) => ({
         key: parameter.name ?? "",
-        value: String(parameter.example ?? parameter.schema?.example ?? ""),
+        value: String(parameter.example ?? parameter.schema?.example ?? parameter.schema?.default ?? ""),
         enabled: parameter.in === "path",
         location: parameter.in === "path" ? "path" as const : "query" as const
       }));
-    const media = operation.requestBody?.content?.["application/json"];
-    const example = media?.example ?? media?.schema?.example ?? media?.schema?.default;
+    const example = this.requestBodyExample(operation, spec);
 
     return {
       id,
@@ -139,5 +161,97 @@ export class SwaggerStrategy implements IDiscoveryStrategy {
 
   private isOperation(value: OpenApiOperation | OpenApiParameter[] | undefined): value is OpenApiOperation {
     return Boolean(value) && !Array.isArray(value);
+  }
+
+  private requestBodyExample(operation: OpenApiOperation, spec: OpenApiDocument): unknown {
+    const content = operation.requestBody?.content;
+    const media = content?.["application/json"] ?? Object.entries(content ?? {}).find(([type]) => type.includes("json"))?.[1];
+    if (media) {
+      if (media.example !== undefined) {
+        return media.example;
+      }
+      const namedExample = Object.values(media.examples ?? {}).find((example) => example.value !== undefined)?.value;
+      if (namedExample !== undefined) {
+        return namedExample;
+      }
+      if (media.schema) {
+        return this.schemaExample(media.schema, spec, new Set<string>());
+      }
+    }
+
+    const swaggerBodyParameter = operation.parameters?.find((parameter) => parameter.in === "body");
+    return swaggerBodyParameter?.schema
+      ? this.schemaExample(swaggerBodyParameter.schema, spec, new Set<string>())
+      : undefined;
+  }
+
+  private schemaExample(schema: OpenApiSchema, spec: OpenApiDocument, seenReferences: Set<string>): unknown {
+    if (schema.example !== undefined) {
+      return schema.example;
+    }
+    if (schema.default !== undefined) {
+      return schema.default;
+    }
+    if (schema.enum?.length) {
+      return schema.enum[0];
+    }
+    if (schema.$ref) {
+      if (seenReferences.has(schema.$ref)) {
+        return {};
+      }
+      const resolved = this.resolveReference(schema.$ref, spec);
+      if (!resolved) {
+        return {};
+      }
+      seenReferences.add(schema.$ref);
+      const example = this.schemaExample(resolved, spec, seenReferences);
+      seenReferences.delete(schema.$ref);
+      return example;
+    }
+    if (schema.allOf?.length) {
+      return schema.allOf.reduce<Record<string, unknown>>((result, item) => {
+        const example = this.schemaExample(item, spec, seenReferences);
+        return example && typeof example === "object" && !Array.isArray(example)
+          ? { ...result, ...(example as Record<string, unknown>) }
+          : result;
+      }, {});
+    }
+    if (schema.oneOf?.length || schema.anyOf?.length) {
+      return this.schemaExample((schema.oneOf ?? schema.anyOf)![0], spec, seenReferences);
+    }
+    if (schema.type === "array") {
+      return [this.schemaExample(schema.items ?? {}, spec, seenReferences)];
+    }
+    if (schema.type === "object" || schema.properties) {
+      return Object.fromEntries(
+        Object.entries(schema.properties ?? {}).map(([name, property]) => [name, this.schemaExample(property, spec, seenReferences)])
+      );
+    }
+    if (schema.type === "integer" || schema.type === "number") {
+      return 0;
+    }
+    if (schema.type === "boolean") {
+      return true;
+    }
+    switch (schema.format) {
+      case "date": return "2026-01-01";
+      case "date-time": return "2026-01-01T00:00:00.000Z";
+      case "uuid": return "00000000-0000-0000-0000-000000000000";
+      case "email": return "user@example.com";
+      case "uri": return "https://example.com";
+      default: return "string";
+    }
+  }
+
+  private resolveReference(reference: string, spec: OpenApiDocument): OpenApiSchema | undefined {
+    const componentPrefix = "#/components/schemas/";
+    const definitionPrefix = "#/definitions/";
+    if (reference.startsWith(componentPrefix)) {
+      return spec.components?.schemas?.[reference.slice(componentPrefix.length)];
+    }
+    if (reference.startsWith(definitionPrefix)) {
+      return spec.definitions?.[reference.slice(definitionPrefix.length)];
+    }
+    return undefined;
   }
 }

@@ -4,7 +4,7 @@ interface EndpointTreeProps {
   requests: RequestSpec[];
   endpoints: Endpoint[];
   activeId: string;
-  onSelect(request: RequestSpec): void;
+  onSelect(request: RequestSpec, source: "collection" | "discovery"): void;
   onNew(): void;
 }
 
@@ -30,7 +30,7 @@ export function EndpointTree({ requests, endpoints, activeId, onSelect, onNew }:
           <button
             key={request.id}
             className={`endpoint-item ${request.id === activeId ? "selected" : ""}`}
-            onClick={() => onSelect(request)}
+            onClick={() => onSelect(request, "collection")}
           >
             <span className={methodClass(request.method)}>{request.method}</span>
             <span className="endpoint-name">{request.name || "Sin nombre"}</span>
@@ -43,8 +43,8 @@ export function EndpointTree({ requests, endpoints, activeId, onSelect, onNew }:
               <button
                 key={endpoint.id}
                 className={`endpoint-item ${endpoint.request.id === activeId ? "selected" : ""}`}
-                onClick={() => onSelect(endpoint.request)}
-                title={endpoint.path}
+                onClick={() => onSelect(endpoint.request, "discovery")}
+                title={`Usar la definición sincronizada de ${endpoint.path}`}
               >
                 <span className={methodClass(endpoint.method)}>{endpoint.method}</span>
                 <span className="endpoint-name">{endpoint.name}</span>

@@ -147,11 +147,18 @@ export class EasyRequestEditorProvider implements vscode.CustomTextEditorProvide
     const next = {
       ...document,
       endpoints: result.endpoints,
+      environments: result.baseUrl ? this.setApiUrl(document, result.baseUrl) : document.environments,
       swaggerUrl: swaggerUrl?.trim() || document.swaggerUrl,
       discoverySource: result.source
     } satisfies EasyRequestDocument;
     await this.writeDocument(textDocument, next);
-    this.post(webview, { type: "discoveryComplete", source: result.source, count: result.endpoints.length, warning: result.warning });
+    this.post(webview, {
+      type: "discoveryComplete",
+      source: result.source,
+      count: result.endpoints.length,
+      baseUrl: result.baseUrl,
+      warning: result.warning
+    });
   }
 
   private async discoverDotNet(
@@ -218,6 +225,13 @@ export class EasyRequestEditorProvider implements vscode.CustomTextEditorProvide
 
   private serialize(document: EasyRequestDocument): string {
     return `${JSON.stringify(document, null, 2)}\n`;
+  }
+
+  private setApiUrl(document: EasyRequestDocument, baseUrl: string): EasyRequestDocument["environments"] {
+    return document.environments.map((environment) => environment.id === document.selectedEnvironmentId
+      ? { ...environment, variables: { ...environment.variables, apiUrl: baseUrl } }
+      : environment
+    );
   }
 
   private isEasyRequest(document: vscode.TextDocument): boolean {
