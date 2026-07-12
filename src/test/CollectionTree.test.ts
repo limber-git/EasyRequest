@@ -1,6 +1,6 @@
 import * as assert from "node:assert/strict";
 import test from "node:test";
-import { requestWithContext } from "../services/CollectionTree";
+import { moveNode, requestWithContext, updateFolderBaseUrl } from "../services/CollectionTree";
 import { CollectionFolder } from "../types";
 
 test("uses the closest inherited base URL for a nested request", () => {
@@ -41,4 +41,20 @@ test("does not prepend a folder base URL to an explicit request URL", () => {
   };
 
   assert.equal(requestWithContext(root, "external")?.url, "https://example.test/health");
+});
+
+test("does not move a folder into one of its descendants", () => {
+  const root: CollectionFolder = {
+    id: "root", type: "folder", name: "Collection", children: [{
+      id: "parent", type: "folder", name: "Parent", children: [{ id: "child", type: "folder", name: "Child", children: [] }]
+    }]
+  };
+
+  assert.deepEqual(moveNode(root, "parent", "child", 0), root);
+});
+
+test("removes a folder base URL when it is cleared", () => {
+  const root: CollectionFolder = { id: "root", type: "folder", name: "Collection", baseUrl: "{{apiUrl}}", children: [] };
+
+  assert.equal(updateFolderBaseUrl(root, "root", undefined).baseUrl, undefined);
 });

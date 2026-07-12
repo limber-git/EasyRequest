@@ -1,99 +1,68 @@
-import { useMemo, useState } from "react";
-import type { HttpMethod, RequestSpec } from "../../../src/types";
+import { useEffect, useMemo, useState } from "react";
+import type { CollectionFolder, Environment, RequestSpec } from "../../../src/types";
 import { KeyValueEditor } from "./KeyValueEditor";
+import { ContextLens } from "./ContextLens";
+import { AuthEditor } from "./request/AuthEditor";
+import { RequestBodyEditor, validateJson } from "./request/RequestBodyEditor";
+import { RequestExecutionBar } from "./request/RequestExecutionBar";
 
 interface RequestPanelProps {
   request: RequestSpec;
+  root: CollectionFolder;
+  environment: Environment | undefined;
   onChange(request: RequestSpec): void;
   onExecute(total: number, concurrency: number): void;
   onCancel(): void;
   running: boolean;
+  onEditFolderBaseUrl?(folderId: string): void;
+  onOpenEnvironment?(): void;
 }
 
-const methods: HttpMethod[] = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
+type RequestTab = "headers" | "params" | "body" | "auth";
 
-export function RequestPanel({ request, onChange, onExecute, onCancel, running }: RequestPanelProps): JSX.Element {
-  const [tab, setTab] = useState<"headers" | "params" | "body">("body");
+export function RequestPanel(props: RequestPanelProps): JSX.Element {
+  const [tab, setTab] = useState<RequestTab>("body");
   const [total, setTotal] = useState(1);
   const [concurrency, setConcurrency] = useState(1);
-  const patch = (update: Partial<RequestSpec>) => onChange({ ...request, ...update });
-  const jsonError = useMemo(() => {
-    if (request.bodyType !== "json" || !request.body.trim()) {
-      return undefined;
-    }
-    try {
-      JSON.parse(request.body);
-      return undefined;
-    } catch (error) {
-      return error instanceof Error ? error.message : "JSON inválido";
-    }
-  }, [request.body, request.bodyType]);
+  const jsonError = useMemo(() => validateJson(props.request.body, props.request.bodyType), [props.request.body, props.request.bodyType]);
+  const patch = (update: Partial<RequestSpec>) => props.onChange({ ...props.request, ...update });
 
-  return (
-    <main className="request-panel">
-      <div className="pane-heading">Constructor de petición</div>
-      <div className="request-title-row">
-        <input
-          className="request-name"
-          value={request.name}
-          placeholder="Nombre de la petición"
-          onChange={(event) => patch({ name: event.target.value })}
-        />
-      </div>
-      <div className="request-line">
-        <select className={`method-select method-${request.method.toLowerCase()}`} value={request.method} onChange={(event) => patch({ method: event.target.value as HttpMethod })}>
-          {methods.map((method) => <option value={method} key={method}>{method}</option>)}
-        </select>
-        <input className="url-input" value={request.url} placeholder="https://api.example.com/users" onChange={(event) => patch({ url: event.target.value })} />
-        {running ? (
-          <button className="vscode-button secondary" onClick={onCancel}>Cancelar</button>
-        ) : (
-          <button className="vscode-button primary" disabled={Boolean(jsonError)} onClick={() => onExecute(total, concurrency)}>Enviar</button>
-        )}
-      </div>
-      <div className="burst-row">
-        <span>Ráfaga</span>
-        <label>Solicitudes <input type="number" min="1" max="500" value={total} onChange={(event) => setTotal(Math.min(500, Math.max(1, Number(event.target.value))))} /></label>
-        <label>En paralelo <input type="number" min="1" max="20" value={concurrency} onChange={(event) => setConcurrency(Math.min(20, Math.max(1, Number(event.target.value))))} /></label>
-      </div>
-      <div className="request-tabs" role="tablist" aria-label="Datos de la petición">
-        {(["headers", "params", "body"] as const).map((item) => (
-          <button className={tab === item ? "active" : ""} onClick={() => setTab(item)} key={item} role="tab" aria-selected={tab === item} tabIndex={tab === item ? 0 : -1}>
-            {item === "headers" ? `Headers (${request.headers.filter((entry) => entry.enabled).length})` : item === "params" ? `Params (${request.params.filter((entry) => entry.enabled).length})` : "Body"}
-          </button>
-        ))}
-      </div>
-      <div className="request-content">
-        {tab === "headers" && <KeyValueEditor ariaLabel="Headers" entries={request.headers} onChange={(headers) => patch({ headers })} />}
-        {tab === "params" && <KeyValueEditor ariaLabel="Parámetros de consulta" entries={request.params} onChange={(params) => patch({ params })} />}
-        {tab === "body" && (
-          <div className="editor-shell">
-            <div className="body-toolbar">
-              <span>{request.bodyType === "none" ? "Sin body" : request.bodyType.toUpperCase()}</span>
-              <select value={request.bodyType} onChange={(event) => patch({ bodyType: event.target.value as RequestSpec["bodyType"] })}>
-                <option value="none">Ninguno</option>
-                <option value="json">JSON</option>
-                <option value="text">Texto</option>
-              </select>
-            </div>
-            {request.bodyType === "none" ? (
-              <div className="editor-placeholder">Esta petición no enviará body.</div>
-            ) : (
-              <>
-                <textarea
-                  className={`body-editor ${jsonError ? "invalid" : ""}`}
-                  value={request.body}
-                  onChange={(event) => patch({ body: event.target.value })}
-                  spellCheck={false}
-                  aria-label="Body de la petición"
-                  aria-invalid={Boolean(jsonError)}
-                />
-                {jsonError && <div className="validation-error" role="alert">JSON inválido: {jsonError}</div>}
-              </>
-            )}
-          </div>
-        )}
-      </div>
-    </main>
-  );
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === "Enter" && !jsonError && !props.running) {
+        event.preventDefault();
+        props.onExecute(total, concurrency);
+      }
+      if (event.key === "Escape" && props.running) {
+        event.preventDefault();
+        props.onCancel();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [concurrency, jsonError, props, total]);
+
+  return <main className="request-panel">
+    <div className="pane-heading">Constructor de petición</div>
+    <div className="request-title-row"><input className="request-name" value={props.request.name} placeholder="Nombre de la petición" onChange={(event) => patch({ name: event.target.value })} /></div>
+    <ContextLens root={props.root} requestId={props.request.id} requestUrl={props.request.url} environment={props.environment} onEditFolderBaseUrl={props.onEditFolderBaseUrl} onOpenEnvironment={props.onOpenEnvironment} />
+    <RequestExecutionBar method={props.request.method} url={props.request.url} running={props.running} disabled={Boolean(jsonError)} total={total} concurrency={concurrency} onChange={patch} onBurstChange={(update) => { if (update.total !== undefined) setTotal(update.total); if (update.concurrency !== undefined) setConcurrency(update.concurrency); }} onExecute={() => props.onExecute(total, concurrency)} onCancel={props.onCancel} />
+    <RequestTabs active={tab} request={props.request} onSelect={setTab} />
+    <div className="request-content">
+      {tab === "headers" && <KeyValueEditor ariaLabel="Headers" entries={props.request.headers} onChange={(headers) => patch({ headers })} />}
+      {tab === "params" && <KeyValueEditor ariaLabel="Parámetros de consulta" entries={props.request.params} onChange={(params) => patch({ params })} />}
+      {tab === "auth" && <AuthEditor request={props.request} onChange={props.onChange} />}
+      {tab === "body" && <RequestBodyEditor body={props.request.body} bodyType={props.request.bodyType} onChange={patch} />}
+    </div>
+  </main>;
+}
+
+function RequestTabs({ active, request, onSelect }: { active: RequestTab; request: RequestSpec; onSelect(tab: RequestTab): void }): JSX.Element {
+  const labels: Record<RequestTab, string> = {
+    headers: `Headers (${request.headers.filter((entry) => entry.enabled).length})`,
+    params: `Params (${request.params.filter((entry) => entry.enabled).length})`,
+    body: "Body",
+    auth: "Auth"
+  };
+  return <div className="request-tabs" role="tablist" aria-label="Datos de la petición">{(Object.keys(labels) as RequestTab[]).map((tab) => <button className={active === tab ? "active" : ""} onClick={() => onSelect(tab)} key={tab} role="tab" aria-selected={active === tab}>{labels[tab]}</button>)}</div>;
 }

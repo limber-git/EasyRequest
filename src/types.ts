@@ -57,6 +57,18 @@ export interface CollectionRequest {
 
 export type CollectionNode = CollectionFolder | CollectionRequest;
 
+export interface ContractValidation {
+  field: string;
+  type: "exists" | "type" | "value" | "maxDuration";
+  expected?: string;
+}
+
+export interface RequestContract {
+  requestId: string;
+  validations: ContractValidation[];
+  savedAt: string;
+}
+
 export interface EasyRequestDocument {
   version: 2;
   selectedEnvironmentId: string;
@@ -64,6 +76,7 @@ export interface EasyRequestDocument {
   root: CollectionFolder;
   swaggerUrl?: string;
   discoverySource?: "swagger" | "dotnet" | "cache";
+  contracts?: RequestContract[];
 }
 
 export interface HttpResult {

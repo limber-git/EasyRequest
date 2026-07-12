@@ -1,462 +1,100 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent } from "react";
-import type { BatchResult, EasyRequestDocument, Environment, RequestSpec } from "../../src/types";
-import { findRequestNode, removeRequestNode, requestIds, updateRequestNode } from "../../src/services/CollectionTree";
+import { useCallback, useEffect, type CSSProperties } from "react";
+import type { CollectionFolder, EasyRequestDocument, Environment, RequestContract, RequestSpec } from "../../src/types";
+import { addFolder, addRequestToFolder, findRequestNode, removeRequestNode, requestIds, renameNode, updateFolderBaseUrl, updateRequestNode, moveNode } from "../../src/services/CollectionTree";
 import { EndpointTree } from "./components/EndpointTree";
 import { EnvironmentEditor } from "./components/EnvironmentEditor";
 import { RequestPanel } from "./components/RequestPanel";
 import { ResponsePanel } from "./components/ResponsePanel";
+import { useCollectionDocument } from "./hooks/useCollectionDocument";
+import { usePaneResize } from "./hooks/usePaneResize";
 import { getVsCodeApi } from "./vscode-api";
 
-type HostMessage =
-  | { type: "document"; document: EasyRequestDocument; revision: number }
-  | { type: "documentError"; message: string }
-  | { type: "saveComplete"; requestId: number; revision: number }
-  | { type: "documentConflict"; document: EasyRequestDocument; revision: number; requestId?: number }
-  | { type: "batchResult"; batch: BatchResult }
-  | { type: "requestCancelled" }
-  | { type: "copySaved" }
-  | { type: "error" | "warning"; message: string }
-  | { type: "discoveryComplete"; source: string; count: number; baseUrl?: string; warning?: string };
-
-const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === "object" && !Array.isArray(value);
-const isHostMessage = (value: unknown): value is HostMessage => {
-  if (!isRecord(value) || typeof value.type !== "string") {
-    return false;
-  }
-  switch (value.type) {
-    case "document":
-      return isRecord(value.document) && typeof value.revision === "number";
-    case "documentError":
-    case "error":
-    case "warning":
-      return typeof value.message === "string";
-    case "saveComplete":
-      return typeof value.requestId === "number" && typeof value.revision === "number";
-    case "documentConflict":
-      return isRecord(value.document) && typeof value.revision === "number";
-    case "batchResult":
-      return isRecord(value.batch) && Array.isArray(value.batch.results);
-    case "requestCancelled":
-    case "copySaved":
-      return true;
-    case "discoveryComplete":
-      return typeof value.source === "string" && typeof value.count === "number";
-    default:
-      return false;
-  }
-};
-
-const createInitialDocument = (): EasyRequestDocument => ({
-  version: 2,
-  selectedEnvironmentId: "default",
-  environments: [{ id: "default", name: "Default", variables: { apiUrl: "https://httpbin.org" } }],
-  root: {
-    id: "root",
-    type: "folder",
-    name: "Colección",
-    baseUrl: "{{apiUrl}}",
-    children: [{
-      id: "request-1",
-      type: "request",
-      name: "Nueva petición",
-      request: { id: "request-1", name: "Nueva petición", method: "GET", url: "/get", headers: [], params: [], body: "", bodyType: "none" }
-    }]
-  }
-});
-
-const SPLITTER_WIDTH = 8;
-const MIN_COLLECTION_WIDTH = 180;
-const MAX_COLLECTION_WIDTH = 360;
-const MIN_CONSTRUCTOR_WIDTH = 320;
-const MIN_RESPONSE_WIDTH = 280;
 const RESIZE_STEP = 20;
-
-type Splitter = "collection" | "response";
-
-interface PaneWidths {
-  collection: number;
-  response: number;
-}
-
-interface ResizeSession {
-  splitter: Splitter;
-  startX: number;
-  widths: PaneWidths;
-}
 
 export function App(): JSX.Element {
   const vscode = getVsCodeApi();
-  const [document, setDocument] = useState<EasyRequestDocument>(createInitialDocument);
-  const documentRef = useRef(document);
-  const [activeRequestId, setActiveRequestId] = useState(() => {
-    const restoredState = vscode.getState() as { activeRequestId?: unknown } | undefined;
-    return typeof restoredState?.activeRequestId === "string" ? restoredState.activeRequestId : requestIds(document.root)[0] ?? "";
-  });
-  const [batch, setBatch] = useState<BatchResult>();
-  const [notice, setNotice] = useState<string>();
-  const [swaggerUrl, setSwaggerUrl] = useState("");
-  const [loadError, setLoadError] = useState<string>();
-  const [running, setRunning] = useState(false);
-  const [conflict, setConflict] = useState<{ document: EasyRequestDocument; revision: number }>();
-  const conflictRef = useRef<{ document: EasyRequestDocument; revision: number }>();
-  const revisionRef = useRef(0);
-  const dirtyRef = useRef(false);
-  const saveTimer = useRef<number>();
-  const saveInFlight = useRef<number>();
-  const sentSnapshot = useRef("");
-  const nextSaveId = useRef(1);
-  const workspaceRef = useRef<HTMLDivElement>(null);
-  const resizeSessionRef = useRef<ResizeSession>();
-  const [paneWidths, setPaneWidths] = useState<PaneWidths>({ collection: 260, response: 360 });
-  const [isResizing, setIsResizing] = useState(false);
-
-  const getWorkspaceWidth = () => workspaceRef.current?.getBoundingClientRect().width ?? 0;
-  const clamp = (value: number, minimum: number, maximum: number) => Math.min(Math.max(value, minimum), Math.max(minimum, maximum));
-  const resizePane = (splitter: Splitter, delta: number, startWidths?: PaneWidths) => {
-    setPaneWidths((current) => {
-      const widths = startWidths ?? current;
-      const workspaceWidth = getWorkspaceWidth();
-      const availableWidth = workspaceWidth - (SPLITTER_WIDTH * 2);
-
-      if (splitter === "collection") {
-        const maxCollectionWidth = Math.min(MAX_COLLECTION_WIDTH, availableWidth - widths.response - MIN_CONSTRUCTOR_WIDTH);
-        return { ...widths, collection: clamp(widths.collection + delta, MIN_COLLECTION_WIDTH, maxCollectionWidth) };
-      }
-
-      const maxResponseWidth = availableWidth - widths.collection - MIN_CONSTRUCTOR_WIDTH;
-      return { ...widths, response: clamp(widths.response - delta, MIN_RESPONSE_WIDTH, maxResponseWidth) };
-    });
-  };
-
-  const startResize = (splitter: Splitter, event: PointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0) {
-      return;
-    }
-    event.currentTarget.setPointerCapture(event.pointerId);
-    resizeSessionRef.current = { splitter, startX: event.clientX, widths: paneWidths };
-    setIsResizing(true);
-  };
-
-  const moveResize = (splitter: Splitter, event: PointerEvent<HTMLDivElement>) => {
-    const session = resizeSessionRef.current;
-    if (!session || session.splitter !== splitter) {
-      return;
-    }
-    resizePane(splitter, event.clientX - session.startX, session.widths);
-  };
-
-  const finishResize = (event: PointerEvent<HTMLDivElement>) => {
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-    resizeSessionRef.current = undefined;
-    setIsResizing(false);
-  };
-
-  useEffect(() => {
-    const workspace = workspaceRef.current;
-    if (!workspace) {
-      return;
-    }
-    const keepWidthsInBounds = () => {
-      setPaneWidths((current) => {
-        const availableWidth = getWorkspaceWidth() - (SPLITTER_WIDTH * 2);
-        const collection = clamp(
-          current.collection,
-          MIN_COLLECTION_WIDTH,
-          Math.min(MAX_COLLECTION_WIDTH, availableWidth - current.response - MIN_CONSTRUCTOR_WIDTH)
-        );
-        const response = clamp(current.response, MIN_RESPONSE_WIDTH, availableWidth - collection - MIN_CONSTRUCTOR_WIDTH);
-        return collection === current.collection && response === current.response ? current : { collection, response };
-      });
-    };
-    const observer = new ResizeObserver(keepWidthsInBounds);
-    observer.observe(workspace);
-    return () => observer.disconnect();
-  }, []);
-
-  const applyHostDocument = (next: EasyRequestDocument, revision: number) => {
-    const sameAsLocal = JSON.stringify(next) === JSON.stringify(documentRef.current);
-    if ((dirtyRef.current || saveInFlight.current) && !sameAsLocal) {
-      const pendingConflict = { document: next, revision };
-      conflictRef.current = pendingConflict;
-      setConflict(pendingConflict);
-      setNotice("La colección cambió fuera de EasyRequest. Recarga los cambios externos o conserva tu edición sin sobrescribir el archivo.");
-      return;
-    }
-    revisionRef.current = revision;
-    dirtyRef.current = false;
-    documentRef.current = next;
-    setDocument(next);
-    setLoadError(undefined);
-    setActiveRequestId((current) => findRequestNode(next.root, current) ? current : requestIds(next.root)[0] ?? "");
-    setSwaggerUrl(next.swaggerUrl ?? "");
-  };
-
-  const flushSave = useCallback(() => {
-    if (saveTimer.current) {
-      window.clearTimeout(saveTimer.current);
-      saveTimer.current = undefined;
-    }
-    if (!dirtyRef.current || saveInFlight.current || !revisionRef.current || conflictRef.current) {
-      return;
-    }
-    const requestId = nextSaveId.current++;
-    saveInFlight.current = requestId;
-    sentSnapshot.current = JSON.stringify(documentRef.current);
-    vscode.postMessage({
-      type: "saveDocument",
-      document: documentRef.current,
-      baseRevision: revisionRef.current,
-      requestId
-    });
-  }, [vscode]);
-
-  const persist = () => {
-    dirtyRef.current = true;
-    if (saveTimer.current) {
-      window.clearTimeout(saveTimer.current);
-    }
-    if (!saveInFlight.current) {
-      saveTimer.current = window.setTimeout(flushSave, 250);
-    }
-  };
-
-  const updateDocument = (updater: (current: EasyRequestDocument) => EasyRequestDocument) => {
-    const next = updater(documentRef.current);
-    documentRef.current = next;
-    setDocument(next);
-    persist();
-  };
-
-  useEffect(() => {
-    const listener = (event: MessageEvent<unknown>) => {
-      // VS Code may dispatch bridge messages without a browser origin/source. The payload is
-      // therefore validated strictly instead of relying on ordinary cross-window metadata.
-      if ((event.origin && event.origin !== window.location.origin) || !isHostMessage(event.data)) {
-        return;
-      }
-      const message = event.data;
-      switch (message.type) {
-        case "document":
-          applyHostDocument(message.document, message.revision);
-          break;
-        case "documentError":
-          setRunning(false);
-          setLoadError(message.message);
-          break;
-        case "saveComplete":
-          if (message.requestId === saveInFlight.current) {
-            revisionRef.current = message.revision;
-            saveInFlight.current = undefined;
-            dirtyRef.current = JSON.stringify(documentRef.current) !== sentSnapshot.current;
-            if (dirtyRef.current) {
-              window.setTimeout(flushSave, 0);
-            }
-          }
-          break;
-        case "documentConflict":
-          saveInFlight.current = undefined;
-          conflictRef.current = { document: message.document, revision: message.revision };
-          setConflict(conflictRef.current);
-          setNotice("Se evitó sobrescribir una modificación externa de la colección.");
-          break;
-        case "batchResult":
-          setBatch(message.batch);
-          setRunning(false);
-          break;
-        case "requestCancelled":
-          setRunning(false);
-          setNotice("Petición cancelada.");
-          break;
-        case "copySaved":
-          setNotice("La edición local se guardó como una nueva colección.");
-          if (conflictRef.current) {
-            const external = conflictRef.current;
-            saveInFlight.current = undefined;
-            dirtyRef.current = false;
-            conflictRef.current = undefined;
-            setConflict(undefined);
-            applyHostDocument(external.document, external.revision);
-          }
-          break;
-        case "discoveryComplete": {
-          const origin = message.baseUrl ? ` Origen guardado: {{apiUrl}} = ${message.baseUrl}.` : "";
-          setNotice(`${message.count} endpoints cargados desde ${message.source}.${origin}${message.warning ? ` ${message.warning}` : ""}`);
-          break;
-        }
-        case "error":
-          setRunning(false);
-          saveInFlight.current = undefined;
-          setNotice(message.message);
-          break;
-        case "warning":
-          setNotice(message.message);
-          break;
-      }
-    };
-    const flushWhenHidden = () => {
-      if (window.document.visibilityState === "hidden") {
-        flushSave();
-      }
-    };
-    window.addEventListener("message", listener);
-    window.addEventListener("pagehide", flushSave);
-    window.document.addEventListener("visibilitychange", flushWhenHidden);
-    vscode.postMessage({ type: "ready" });
-    return () => {
-      window.removeEventListener("message", listener);
-      window.removeEventListener("pagehide", flushSave);
-      window.document.removeEventListener("visibilitychange", flushWhenHidden);
-      flushSave();
-    };
-  }, [flushSave, vscode]);
-
-  useEffect(() => {
-    vscode.setState({ activeRequestId });
-  }, [activeRequestId, vscode]);
-
-  const activeNode = findRequestNode(document.root, activeRequestId) ?? (requestIds(document.root)[0] ? findRequestNode(document.root, requestIds(document.root)[0]) : undefined);
+  const state = useCollectionDocument(vscode);
+  const { workspaceRef, paneWidths, isResizing, resizePane, startResize, moveResize, finishResize } = usePaneResize();
+  const activeNode = findRequestNode(state.document.root, state.activeRequestId) ?? findRequestNode(state.document.root, requestIds(state.document.root)[0] ?? "");
   const activeRequest = activeNode?.request;
-  const selectRequest = (id: string) => setActiveRequestId(id);
-  const updateRequest = (request: RequestSpec) => {
-    updateDocument((current) => ({ ...current, root: updateRequestNode(current.root, request.id, () => request) as typeof current.root }));
-  };
-  const newRequest = () => {
+  const activeEnvironment = state.document.environments.find((item) => item.id === state.document.selectedEnvironmentId);
+
+  const updateRequest = (request: RequestSpec) => state.updateDocument((current) => ({ ...current, root: updateRequestNode(current.root, request.id, () => request) as CollectionFolder }));
+  const createRequest = (parentId = state.document.root.id) => {
     const id = crypto.randomUUID();
     const request: RequestSpec = { id, name: "Nueva petición", method: "GET", url: "/", headers: [], params: [], body: "", bodyType: "none" };
-    setActiveRequestId(id);
-    updateDocument((current) => ({ ...current, root: { ...current.root, children: [...current.root.children, { id, type: "request", name: request.name, request }] } }));
+    state.setActiveRequestId(id);
+    state.updateDocument((current) => ({ ...current, root: addRequestToFolder(current.root, parentId, { id, type: "request", name: request.name, request }) }));
   };
-  const deleteRequest = (id: string) => {
-    updateDocument((current) => ({ ...current, root: removeRequestNode(current.root, id) }));
-    setActiveRequestId((current) => current === id ? requestIds(removeRequestNode(documentRef.current.root, id))[0] ?? "" : current);
+  const createFolder = (parentId = state.document.root.id) => state.updateDocument((current) => {
+    const id = crypto.randomUUID();
+    return { ...current, root: addFolder(current.root, parentId, { id, type: "folder", name: "Nueva carpeta", children: [] }) };
+  });
+  const deleteNode = (id: string) => {
+    state.updateDocument((current) => ({ ...current, root: removeRequestNode(current.root, id), contracts: current.contracts?.filter((contract) => contract.requestId !== id) }));
+    if (state.activeRequestId === id) state.setActiveRequestId(requestIds(removeRequestNode(state.documentRef.current.root, id))[0] ?? "");
   };
-  const changeEnvironment = (environment: Environment) => {
-    updateDocument((current) => ({
-      ...current,
-      environments: current.environments.map((item) => item.id === environment.id ? environment : item)
-    }));
-  };
-  const addEnvironment = () => {
-    updateDocument((current) => {
-      const id = crypto.randomUUID();
-      return {
-        ...current,
-        selectedEnvironmentId: id,
-        environments: [...current.environments, { id, name: `Entorno ${current.environments.length + 1}`, variables: {} }]
-      };
-    });
-  };
-  const deleteEnvironment = (id: string) => {
-    updateDocument((current) => {
-      const environments = current.environments.filter((environment) => environment.id !== id);
-      return { ...current, environments, selectedEnvironmentId: environments[0]?.id ?? "" };
-    });
-  };
-  const execute = (total: number, concurrency: number) => {
-    if (!activeRequest) {
-      return;
-    }
-    flushSave();
-    setRunning(true);
-    vscode.postMessage({
-      type: "executeRequest",
-      document: documentRef.current,
-      requestId: activeRequest.id,
-      environmentId: documentRef.current.selectedEnvironmentId,
-      total,
-      concurrency
-    });
-  };
-  const discover = () => {
-    flushSave();
-    vscode.postMessage({ type: "discover", swaggerUrl });
-  };
-  const reloadConflict = () => {
-    if (!conflict) {
-      return;
-    }
-    saveInFlight.current = undefined;
-    dirtyRef.current = false;
-    conflictRef.current = undefined;
-    setConflict(undefined);
-    applyHostDocument(conflict.document, conflict.revision);
-    setNotice("Cambios externos cargados.");
-  };
+  const saveContract = (contract: RequestContract) => state.updateDocument((current) => ({ ...current, contracts: [...(current.contracts ?? []).filter((item) => item.requestId !== contract.requestId), contract] }));
+  const deleteContract = () => state.updateDocument((current) => ({ ...current, contracts: current.contracts?.filter((item) => item.requestId !== state.activeRequestId) }));
+  const changeEnvironment = (environment: Environment) => state.updateDocument((current) => ({ ...current, environments: current.environments.map((item) => item.id === environment.id ? environment : item) }));
+  const addEnvironment = () => state.updateDocument((current) => {
+    const id = crypto.randomUUID();
+    return { ...current, selectedEnvironmentId: id, environments: [...current.environments, { id, name: `Entorno ${current.environments.length + 1}`, variables: {} }] };
+  });
+  const deleteEnvironment = (id: string) => state.updateDocument((current) => {
+    const environments = current.environments.filter((environment) => environment.id !== id);
+    return { ...current, environments, selectedEnvironmentId: environments[0]?.id ?? "" };
+  });
+  const execute = useCallback((total: number, concurrency: number) => {
+    if (!activeRequest) return;
+    state.flushSave();
+    state.setRunning(true);
+    vscode.postMessage({ type: "executeRequest", document: state.documentRef.current, requestId: activeRequest.id, environmentId: state.documentRef.current.selectedEnvironmentId, total, concurrency });
+  }, [activeRequest, state, vscode]);
 
-  if (loadError) {
-    return <main className="fatal-error"><h1>No se pudo abrir la colección</h1><p>{loadError}</p><p>El archivo no fue modificado. Corrige el JSON en el editor de texto o restaura una copia válida.</p></main>;
-  }
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey)) return;
+      const selector = event.key === "p" ? ".tree-search input" : event.key === "k" ? ".url-input" : undefined;
+      if (selector) { event.preventDefault(); (window.document.querySelector(selector) as HTMLElement | null)?.focus(); }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
-  return (
-    <div className="app-shell">
-      <header className="topbar">
-        <div className="brand"><span className="brand-mark">↗</span> EasyRequest</div>
-        <div className="sync-controls">
-          <input value={swaggerUrl} placeholder="URL de swagger/openapi.json" onChange={(event) => setSwaggerUrl(event.target.value)} aria-label="URL de Swagger" />
-          <button className="vscode-button secondary" onClick={discover}>Sincronizar</button>
-          <button className="vscode-button secondary" onClick={() => { flushSave(); vscode.postMessage({ type: "discoverDotNet" }); }}>Analizar C#</button>
-        </div>
-        <EnvironmentEditor
-          environments={document.environments}
-          selectedId={document.selectedEnvironmentId}
-          onSelect={(id) => updateDocument((current) => ({ ...current, selectedEnvironmentId: id }))}
-          onChange={changeEnvironment}
-          onAdd={addEnvironment}
-          onDelete={deleteEnvironment}
-        />
-      </header>
-      {notice && <div className="notice" role="status"><span>{notice}</span><button className="icon-button" onClick={() => setNotice(undefined)} aria-label="Cerrar mensaje">×</button></div>}
-      {conflict && <div className="conflict" role="alert"><span>Hay cambios externos pendientes.</span><button className="vscode-button secondary" onClick={reloadConflict}>Recargar archivo</button><button className="text-button" onClick={() => vscode.postMessage({ type: "saveCopy", document: documentRef.current })}>Guardar edición como copia</button></div>}
-      <div
-        ref={workspaceRef}
-        className={`workspace-grid${isResizing ? " is-resizing" : ""}`}
-        style={{
-          "--collection-width": `${paneWidths.collection}px`,
-          "--response-width": `${paneWidths.response}px`
-        } as CSSProperties}
-      >
-        <EndpointTree root={document.root} activeId={activeRequest?.id ?? ""} onSelect={selectRequest} onNew={newRequest} onDelete={deleteRequest} />
-        <div
-          className="pane-splitter"
-          role="separator"
-          aria-label="Redimensionar colección"
-          aria-orientation="vertical"
-          tabIndex={0}
-          onPointerDown={(event) => startResize("collection", event)}
-          onPointerMove={(event) => moveResize("collection", event)}
-          onPointerUp={finishResize}
-          onPointerCancel={finishResize}
-          onKeyDown={(event) => {
-            if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
-              event.preventDefault();
-              resizePane("collection", event.key === "ArrowLeft" ? -RESIZE_STEP : RESIZE_STEP);
-            }
-          }}
-        />
-        {activeRequest
-          ? <RequestPanel request={activeRequest} onChange={updateRequest} onExecute={execute} onCancel={() => vscode.postMessage({ type: "cancelRequest" })} running={running} />
-          : <main className="request-panel"><div className="response-empty">Crea o selecciona una petición para empezar.</div></main>}
-        <div
-          className="pane-splitter"
-          role="separator"
-          aria-label="Redimensionar respuesta"
-          aria-orientation="vertical"
-          tabIndex={0}
-          onPointerDown={(event) => startResize("response", event)}
-          onPointerMove={(event) => moveResize("response", event)}
-          onPointerUp={finishResize}
-          onPointerCancel={finishResize}
-          onKeyDown={(event) => {
-            if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
-              event.preventDefault();
-              resizePane("response", event.key === "ArrowLeft" ? -RESIZE_STEP : RESIZE_STEP);
-            }
-          }}
-        />
-        <ResponsePanel batch={batch} />
-      </div>
+  if (state.loadError) return <main className="fatal-error"><h1>No se pudo abrir la colección</h1><p>{state.loadError}</p><p>El archivo no fue modificado. Corrige el JSON en el editor de texto o restaura una copia válida.</p></main>;
+
+  return <div className="app-shell">
+    <AppHeader swaggerUrl={state.swaggerUrl} onSwaggerUrlChange={state.setSwaggerUrl} document={state.document} onDiscover={() => { state.flushSave(); vscode.postMessage({ type: "discover", swaggerUrl: state.swaggerUrl }); }} onDiscoverDotNet={() => { state.flushSave(); vscode.postMessage({ type: "discoverDotNet" }); }} onEnvironmentSelect={(id) => state.updateDocument((current) => ({ ...current, selectedEnvironmentId: id }))} onEnvironmentChange={changeEnvironment} onEnvironmentAdd={addEnvironment} onEnvironmentDelete={deleteEnvironment} />
+    {state.notice && <div className="notice" role="status"><span>{state.notice}</span><button className="icon-button" onClick={() => state.setNotice(undefined)} aria-label="Cerrar mensaje">×</button></div>}
+    {state.conflict && <div className="conflict" role="alert"><span>Hay cambios externos pendientes.</span><button className="vscode-button secondary" onClick={state.reloadConflict}>Recargar archivo</button><button className="text-button" onClick={() => vscode.postMessage({ type: "saveCopy", document: state.documentRef.current })}>Guardar edición como copia</button></div>}
+    <div ref={workspaceRef} className={`workspace-grid${isResizing ? " is-resizing" : ""}`} style={{ "--collection-width": `${paneWidths.collection}px`, "--response-width": `${paneWidths.response}px` } as CSSProperties}>
+      <EndpointTree root={state.document.root} activeId={activeRequest?.id ?? ""} onSelect={state.setActiveRequestId} onNew={createRequest} onNewFolder={createFolder} onDelete={deleteNode} onRename={(id, name) => state.updateDocument((current) => ({ ...current, root: renameNode(current.root, id, name) }))} onMove={(nodeId, targetId, index) => state.updateDocument((current) => ({ ...current, root: moveNode(current.root, nodeId, targetId, index) }))} />
+      <PaneSplitter label="Redimensionar colección" side="collection" startResize={startResize} moveResize={moveResize} finishResize={finishResize} resizePane={resizePane} />
+      {activeRequest ? <RequestPanel key={activeRequest.id} request={activeRequest} root={state.document.root} environment={activeEnvironment} onChange={updateRequest} onExecute={execute} onCancel={() => vscode.postMessage({ type: "cancelRequest" })} running={state.running} onEditFolderBaseUrl={(id) => editFolderBaseUrl(state.document.root, id, state.updateDocument)} onOpenEnvironment={() => { const editor = window.document.querySelector(".environment-editor") as HTMLDetailsElement | null; if (editor) editor.open = true; }} /> : <main className="request-panel"><div className="response-empty">Crea o selecciona una petición para empezar.</div></main>}
+      <PaneSplitter label="Redimensionar respuesta" side="response" startResize={startResize} moveResize={moveResize} finishResize={finishResize} resizePane={resizePane} />
+      <ResponsePanel batch={state.batch} contract={state.document.contracts?.find((item) => item.requestId === activeRequest?.id)} requestId={activeRequest?.id ?? ""} onSaveContract={saveContract} onDeleteContract={deleteContract} />
     </div>
-  );
+  </div>;
+}
+
+function AppHeader({ swaggerUrl, onSwaggerUrlChange, document, onDiscover, onDiscoverDotNet, onEnvironmentSelect, onEnvironmentChange, onEnvironmentAdd, onEnvironmentDelete }: { swaggerUrl: string; onSwaggerUrlChange(value: string): void; document: EasyRequestDocument; onDiscover(): void; onDiscoverDotNet(): void; onEnvironmentSelect(id: string): void; onEnvironmentChange(environment: Environment): void; onEnvironmentAdd(): void; onEnvironmentDelete(id: string): void }): JSX.Element {
+  return <header className="topbar"><div className="brand"><span className="brand-mark">↗</span> EasyRequest</div><div className="sync-controls"><input value={swaggerUrl} placeholder="URL de swagger/openapi.json" onChange={(event) => onSwaggerUrlChange(event.target.value)} aria-label="URL de Swagger" /><button className="vscode-button secondary" onClick={onDiscover}>Sincronizar</button><button className="vscode-button secondary" onClick={onDiscoverDotNet}>Analizar C#</button></div><EnvironmentEditor environments={document.environments} selectedId={document.selectedEnvironmentId} onSelect={onEnvironmentSelect} onChange={onEnvironmentChange} onAdd={onEnvironmentAdd} onDelete={onEnvironmentDelete} /></header>;
+}
+
+function PaneSplitter({ label, side, startResize, moveResize, finishResize, resizePane }: { label: string; side: "collection" | "response"; startResize: ReturnType<typeof usePaneResize>["startResize"]; moveResize: ReturnType<typeof usePaneResize>["moveResize"]; finishResize: ReturnType<typeof usePaneResize>["finishResize"]; resizePane: ReturnType<typeof usePaneResize>["resizePane"] }): JSX.Element {
+  return <div className="pane-splitter" role="separator" aria-label={label} aria-orientation="vertical" tabIndex={0} onPointerDown={(event) => startResize(side, event)} onPointerMove={(event) => moveResize(side, event)} onPointerUp={finishResize} onPointerCancel={finishResize} onKeyDown={(event) => { if (event.key === "ArrowLeft" || event.key === "ArrowRight") { event.preventDefault(); resizePane(side, event.key === "ArrowLeft" ? -RESIZE_STEP : RESIZE_STEP); } }} />;
+}
+
+function editFolderBaseUrl(root: CollectionFolder, folderId: string, updateDocument: (updater: (document: EasyRequestDocument) => EasyRequestDocument) => void): void {
+  const folder = findFolder(root, folderId);
+  if (!folder) return;
+  const next = window.prompt(`Editar URL base para la carpeta "${folder.name}":`, folder.baseUrl ?? "");
+  if (next !== null) updateDocument((document) => ({ ...document, root: updateFolderBaseUrl(document.root, folderId, next || undefined) }));
+}
+
+function findFolder(node: CollectionFolder, id: string): CollectionFolder | undefined {
+  if (node.id === id) return node;
+  for (const child of node.children) if (child.type === "folder") { const match = findFolder(child, id); if (match) return match; }
+  return undefined;
 }

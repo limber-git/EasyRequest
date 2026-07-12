@@ -1,5 +1,5 @@
 import { createDefaultDocument } from "../defaultDocument";
-import { CollectionFolder, CollectionNode, EasyRequestDocument, Endpoint, Environment, HttpMethod, METHODS, RequestSpec } from "../types";
+import { CollectionFolder, CollectionNode, ContractValidation, EasyRequestDocument, Endpoint, Environment, HttpMethod, METHODS, RequestContract, RequestSpec } from "../types";
 
 const MAX_DOCUMENT_BYTES = 5 * 1024 * 1024;
 const BODY_MAX_LENGTH = 2 * 1024 * 1024;
@@ -55,13 +55,17 @@ export class DocumentCodec {
     const discoverySource = document.discoverySource === undefined
       ? undefined
       : this.oneOf(document.discoverySource, ["swagger", "dotnet", "cache"] as const, "discoverySource");
+    const contracts = document.contracts === undefined
+      ? undefined
+      : this.array(document.contracts, "contracts", 2000).map((item, index) => this.contract(item, index));
     return {
       version: 2,
       selectedEnvironmentId,
       environments,
       root,
       ...(swaggerUrl === undefined ? {} : { swaggerUrl }),
-      ...(discoverySource === undefined ? {} : { discoverySource })
+      ...(discoverySource === undefined ? {} : { discoverySource }),
+      ...(contracts === undefined ? {} : { contracts })
     };
   }
 
@@ -180,6 +184,23 @@ export class DocumentCodec {
     const path = `endpoints[${index}]`;
     const item = this.record(value, path);
     return { id: this.string(item.id, `${path}.id`, 500), group: this.string(item.group, `${path}.group`, 500), name: this.string(item.name, `${path}.name`, 1000), method: this.oneOf(item.method, METHODS, `${path}.method`) as HttpMethod, path: this.string(item.path, `${path}.path`, 8192), request: this.request(item.request, `${path}.request`) };
+  }
+
+  private contract(value: unknown, index: number): RequestContract {
+    const path = `contracts[${index}]`;
+    const item = this.record(value, path);
+    const requestId = this.string(item.requestId, `${path}.requestId`, 500);
+    const savedAt = this.string(item.savedAt, `${path}.savedAt`, 100);
+    const validations = this.array(item.validations, `${path}.validations`, 200).map((v, vi) => {
+      const vPath = `${path}.validations[${vi}]`;
+      const entry = this.record(v, vPath);
+      return {
+        field: this.string(entry.field, `${vPath}.field`, 500),
+        type: this.oneOf(entry.type, ["exists", "type", "value", "maxDuration"] as const, `${vPath}.type`),
+        ...(entry.expected === undefined ? {} : { expected: this.string(entry.expected, `${vPath}.expected`, 1000) })
+      } satisfies ContractValidation;
+    });
+    return { requestId, validations, savedAt };
   }
 
   private relativeUrl(url: string): string { return url.replace(/^{{\s*[\w.-]+\s*}}/, "") || "/"; }
