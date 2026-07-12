@@ -10,26 +10,40 @@ export interface ResolvedRequest extends Omit<RequestSpec, "headers" | "params">
 export class EnvResolver {
   public resolveRequest(request: RequestSpec, variables: Record<string, string>): ResolvedRequest {
     const missing = new Set<string>();
-    const parameterVariables = this.resolveParameterVariables(request.params, variables, missing);
-    const effectiveVariables = { ...variables, ...parameterVariables };
-    const resolve = (value: string) => this.resolveString(value, effectiveVariables, missing);
+    const resolveEnvironment = (value: string) => this.resolveString(value, variables, missing);
+    const pathVariables = this.resolvePathVariables(request, variables, missing);
+    const resolveUrl = (value: string) => this.resolveString(value, variables, missing, (name) => {
+      if (Object.prototype.hasOwnProperty.call(pathVariables, name)) {
+        return encodeURIComponent(pathVariables[name]);
+      }
+      return undefined;
+    });
 
     return {
       ...request,
-      url: resolve(request.url),
-      body: resolve(request.body),
-      headers: this.resolveEntries(request.headers, resolve),
+      url: resolveUrl(request.url),
+      body: resolveEnvironment(request.body),
+      headers: this.resolveEntries(request.headers, resolveEnvironment),
       params: this.resolveEntries(
         request.params,
-        resolve,
-        (key, entry) => entry.location !== "path" && !this.isRouteToken(request.url, key)
+        resolveEnvironment,
+        (key, entry) => entry.location !== "path" && (entry.location === "query" || !this.isRouteToken(request.url, key))
       ),
       missingVariables: [...missing]
     };
   }
 
-  private resolveString(value: string, variables: Record<string, string>, missing: Set<string>): string {
+  private resolveString(
+    value: string,
+    variables: Record<string, string>,
+    missing: Set<string>,
+    override: (name: string) => string | undefined = () => undefined
+  ): string {
     return value.replace(/{{\s*([\w.-]+)\s*}}/g, (token, name: string) => {
+      const overridden = override(name);
+      if (overridden !== undefined) {
+        return overridden;
+      }
       if (Object.prototype.hasOwnProperty.call(variables, name)) {
         return variables[name];
       }
@@ -38,15 +52,17 @@ export class EnvResolver {
     });
   }
 
-  private resolveParameterVariables(
-    entries: KeyValue[],
+  private resolvePathVariables(
+    request: RequestSpec,
     variables: Record<string, string>,
     missing: Set<string>
   ): Record<string, string> {
-    return entries.reduce<Record<string, string>>((result, entry) => {
+    return request.params.reduce<Record<string, string>>((result, entry) => {
       if (entry.enabled && entry.key.trim()) {
         const key = this.resolveString(entry.key, variables, missing).trim();
-        result[key] = this.resolveString(entry.value, variables, missing);
+        if (entry.location === "path" || (entry.location === undefined && this.isRouteToken(request.url, key))) {
+          this.setEntry(result, key, this.resolveString(entry.value, variables, missing));
+        }
       }
       return result;
     }, {});
@@ -61,11 +77,15 @@ export class EnvResolver {
       if (entry.enabled && entry.key.trim()) {
         const key = resolve(entry.key).trim();
         if (include(key, entry)) {
-          result[key] = resolve(entry.value);
+          this.setEntry(result, key, resolve(entry.value));
         }
       }
       return result;
     }, {});
+  }
+
+  private setEntry(result: Record<string, string>, key: string, value: string): void {
+    Object.defineProperty(result, key, { value, enumerable: true, configurable: true, writable: true });
   }
 
   private isRouteToken(url: string, key: string): boolean {

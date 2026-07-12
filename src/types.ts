@@ -24,6 +24,8 @@ export interface Environment {
   id: string;
   name: string;
   variables: Record<string, string>;
+  /** Names whose values live in VS Code SecretStorage instead of the collection file. */
+  secretVariableNames?: string[];
 }
 
 export interface Endpoint {
@@ -53,6 +55,7 @@ export interface HttpResult {
   durationMs: number;
   headers: Record<string, string>;
   body: string;
+  truncated?: boolean;
   error?: string;
 }
 

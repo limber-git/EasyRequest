@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { BatchResult, HttpResult } from "../../../src/types";
 
 interface ResponsePanelProps {
@@ -7,8 +7,8 @@ interface ResponsePanelProps {
 
 export function ResponsePanel({ batch }: ResponsePanelProps): JSX.Element {
   const [selectedIndex, setSelectedIndex] = useState(0);
-  useEffect(() => setSelectedIndex(0), [batch]);
-  const selected = batch?.results[selectedIndex];
+  const effectiveIndex = batch?.results.some((result) => result.index === selectedIndex) ? selectedIndex : 0;
+  const selected = batch?.results.find((result) => result.index === effectiveIndex);
   const successCount = batch?.results.filter((result) => result.ok).length ?? 0;
 
   return (
@@ -24,7 +24,7 @@ export function ResponsePanel({ batch }: ResponsePanelProps): JSX.Element {
           </div>
           <div className="batch-results" aria-label="Resultados de la ráfaga">
             {batch.results.map((result) => (
-              <button key={result.index} className={selectedIndex === result.index ? "selected" : ""} onClick={() => setSelectedIndex(result.index)}>
+              <button key={result.index} className={effectiveIndex === result.index ? "selected" : ""} onClick={() => setSelectedIndex(result.index)}>
                 <span>#{result.index + 1}</span>
                 <span className={`status ${result.ok ? "success" : "failure"}`}>{result.status ?? "ERR"}</span>
                 <span>{result.durationMs} ms</span>
@@ -43,10 +43,11 @@ function ResponseDetails({ result }: { result: HttpResult }): JSX.Element {
   const headers = Object.entries(result.headers).map(([key, value]) => `${key}: ${value}`).join("\n");
   return (
     <div className="response-details">
-      <div className="response-meta">
+          <div className="response-meta">
         <span className={`status ${result.ok ? "success" : "failure"}`}>{result.status ?? "Error"} {result.statusText}</span>
         <span>{result.durationMs} ms</span>
-      </div>
+          </div>
+          {result.truncated && <div className="response-warning">Respuesta truncada por el límite configurado.</div>}
       {result.error ? (
         <pre className="request-error">{result.error}</pre>
       ) : (

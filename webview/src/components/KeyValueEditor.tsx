@@ -21,7 +21,7 @@ export function KeyValueEditor({ ariaLabel, entries, onChange }: KeyValueEditorP
         <span />
       </div>
       {entries.map((entry, index) => (
-        <div className="key-value-row" key={`${index}-${entry.key}`}>
+        <div className="key-value-row" key={index}>
           <input
             aria-label={`Activar ${entry.key || "fila"}`}
             type="checkbox"

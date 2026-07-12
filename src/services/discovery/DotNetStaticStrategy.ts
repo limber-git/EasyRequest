@@ -7,6 +7,9 @@ import { DiscoveryResult, IDiscoveryStrategy } from "./IDiscoveryStrategy";
  * controller and minimal-API declarations. It never executes or compiles user code.
  */
 export class DotNetStaticStrategy implements IDiscoveryStrategy {
+  private static readonly maximumFileBytes = 2 * 1024 * 1024;
+  private static readonly maximumConcurrency = 8;
+
   public constructor(private readonly workspaceRoot: vscode.Uri) {}
 
   public async discover(): Promise<DiscoveryResult> {
@@ -15,7 +18,25 @@ export class DotNetStaticStrategy implements IDiscoveryStrategy {
       "**/{bin,obj}/**",
       500
     );
-    const endpointSets = await Promise.all(files.map((file) => this.parseFile(file)));
+    const endpointSets = new Array<Endpoint[]>(files.length);
+    let nextIndex = 0;
+    let skippedLargeFiles = 0;
+    const worker = async () => {
+      while (nextIndex < files.length) {
+        const index = nextIndex++;
+        const stat = await vscode.workspace.fs.stat(files[index]);
+        if (stat.size > DotNetStaticStrategy.maximumFileBytes) {
+          endpointSets[index] = [];
+          skippedLargeFiles += 1;
+        } else {
+          endpointSets[index] = await this.parseFile(files[index]);
+        }
+      }
+    };
+    await Promise.all(Array.from(
+      { length: Math.min(files.length, DotNetStaticStrategy.maximumConcurrency) },
+      () => worker()
+    ));
     const known = new Set<string>();
     const endpoints = endpointSets.flat().filter((endpoint) => {
       const key = `${endpoint.method}:${endpoint.path}`;
@@ -28,7 +49,8 @@ export class DotNetStaticStrategy implements IDiscoveryStrategy {
 
     return {
       source: "dotnet",
-      endpoints: endpoints.sort((left, right) => left.group.localeCompare(right.group) || left.path.localeCompare(right.path))
+      endpoints: endpoints.sort((left, right) => left.group.localeCompare(right.group) || left.path.localeCompare(right.path)),
+      warning: skippedLargeFiles ? `${skippedLargeFiles} archivos C# mayores de 2 MiB fueron omitidos.` : undefined
     };
   }
 
@@ -50,6 +72,8 @@ export class DotNetStaticStrategy implements IDiscoveryStrategy {
       const body = source.slice(openBrace + 1, this.matchingBrace(source, openBrace));
       const controller = className.replace(/Controller$/, "");
       const classRoute = this.routeFromAttributes(attributes) ?? `api/${controller}`;
+      // Escapes keep the nested C# attribute/return-type character classes readable.
+      // eslint-disable-next-line no-useless-escape
       const actionPattern = /((?:\s*\[[^\]]+\]\s*)+)\s*(?:public|internal|protected)\s+(?:async\s+)?[\w<>,?.\[\]\s]+?\s+(\w+)\s*\(/g;
 
       for (const action of body.matchAll(actionPattern)) {
@@ -94,7 +118,7 @@ export class DotNetStaticStrategy implements IDiscoveryStrategy {
       id,
       name,
       method,
-      url: templated,
+      url: `{{apiUrl}}${templated}`,
       headers: [],
       params,
       body: "",

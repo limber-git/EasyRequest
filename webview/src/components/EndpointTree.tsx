@@ -6,11 +6,12 @@ interface EndpointTreeProps {
   activeId: string;
   onSelect(request: RequestSpec, source: "collection" | "discovery"): void;
   onNew(): void;
+  onDelete(id: string): void;
 }
 
 const methodClass = (method: string) => `method method-${method.toLowerCase()}`;
 
-export function EndpointTree({ requests, endpoints, activeId, onSelect, onNew }: EndpointTreeProps): JSX.Element {
+export function EndpointTree({ requests, endpoints, activeId, onSelect, onNew, onDelete }: EndpointTreeProps): JSX.Element {
   const groups = endpoints.reduce<Record<string, Endpoint[]>>((result, endpoint) => {
     (result[endpoint.group] ??= []).push(endpoint);
     return result;
@@ -27,14 +28,13 @@ export function EndpointTree({ requests, endpoints, activeId, onSelect, onNew }:
       <div className="tree-scroll">
         <div className="tree-group">Mis peticiones</div>
         {requests.map((request) => (
-          <button
-            key={request.id}
-            className={`endpoint-item ${request.id === activeId ? "selected" : ""}`}
-            onClick={() => onSelect(request, "collection")}
-          >
-            <span className={methodClass(request.method)}>{request.method}</span>
-            <span className="endpoint-name">{request.name || "Sin nombre"}</span>
-          </button>
+          <div className={`endpoint-row ${request.id === activeId ? "selected" : ""}`} key={request.id}>
+            <button className="endpoint-item" onClick={() => onSelect(request, "collection")}>
+              <span className={methodClass(request.method)}>{request.method}</span>
+              <span className="endpoint-name">{request.name || "Sin nombre"}</span>
+            </button>
+            <button className="delete-request" onClick={() => onDelete(request.id)} title="Eliminar petición" aria-label={`Eliminar ${request.name || "petición"}`}>×</button>
+          </div>
         ))}
         {Object.entries(groups).map(([group, groupEndpoints]) => (
           <section key={group}>

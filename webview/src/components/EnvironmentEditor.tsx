@@ -6,9 +6,10 @@ interface EnvironmentEditorProps {
   onSelect(id: string): void;
   onChange(environment: Environment): void;
   onAdd(): void;
+  onDelete(id: string): void;
 }
 
-export function EnvironmentEditor({ environments, selectedId, onSelect, onChange, onAdd }: EnvironmentEditorProps): JSX.Element {
+export function EnvironmentEditor({ environments, selectedId, onSelect, onChange, onAdd, onDelete }: EnvironmentEditorProps): JSX.Element {
   const selected = environments.find((environment) => environment.id === selectedId) ?? environments[0];
   if (!selected) {
     return <span />;
@@ -16,11 +17,24 @@ export function EnvironmentEditor({ environments, selectedId, onSelect, onChange
   const variables = Object.entries(selected.variables);
   const updateVariable = (oldKey: string, key: string, value: string) => {
     const next = { ...selected.variables };
+    const secrets = new Set(selected.secretVariableNames ?? []);
     delete next[oldKey];
+    if (secrets.delete(oldKey) && key.trim()) {
+      secrets.add(key);
+    }
     if (key.trim()) {
       next[key] = value;
     }
-    onChange({ ...selected, variables: next });
+    onChange({ ...selected, variables: next, secretVariableNames: [...secrets] });
+  };
+  const toggleSecret = (key: string, enabled: boolean) => {
+    const secrets = new Set(selected.secretVariableNames ?? []);
+    if (enabled) {
+      secrets.add(key);
+    } else {
+      secrets.delete(key);
+    }
+    onChange({ ...selected, secretVariableNames: [...secrets] });
   };
 
   return (
@@ -37,16 +51,22 @@ export function EnvironmentEditor({ environments, selectedId, onSelect, onChange
       </summary>
       <div className="environment-popover">
         <div className="environment-title">
-          <span>Variables de {selected.name}</span>
+          <input className="environment-name" value={selected.name} onChange={(event) => onChange({ ...selected, name: event.target.value })} aria-label="Nombre del entorno" />
           <button className="text-button" onClick={onAdd}>+ Entorno</button>
         </div>
-        {variables.map(([key, value]) => (
-          <div className="environment-row" key={key}>
+        {variables.map(([key, value], index) => (
+          <div className="environment-row" key={`${selected.id}-${index}`}>
             <input value={key} onChange={(event) => updateVariable(key, event.target.value, value)} aria-label="Nombre de variable" />
-            <input value={value} onChange={(event) => updateVariable(key, key, event.target.value)} aria-label={`Valor de ${key}`} />
+            <input type={(selected.secretVariableNames ?? []).includes(key) ? "password" : "text"} value={value} onChange={(event) => updateVariable(key, key, event.target.value)} aria-label={`Valor de ${key}`} />
+            <label className="secret-toggle" title="Guardar en VS Code SecretStorage">
+              <input type="checkbox" checked={(selected.secretVariableNames ?? []).includes(key)} onChange={(event) => toggleSecret(key, event.target.checked)} /> secreto
+            </label>
           </div>
         ))}
-        <button className="text-button" onClick={() => updateVariable("", "nuevaVariable", "")}>+ Variable</button>
+        <div className="environment-actions">
+          <button className="text-button" onClick={() => updateVariable("", "nuevaVariable", "")}>+ Variable</button>
+          <button className="text-button danger" disabled={environments.length === 1} onClick={() => onDelete(selected.id)}>Eliminar entorno</button>
+        </div>
       </div>
     </details>
   );

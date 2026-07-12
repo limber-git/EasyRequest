@@ -15,6 +15,8 @@ endpoints de APIs ASP.NET Core sin salir del espacio de trabajo.
   sujeto a restricciones CORS.
 - Ráfagas con cantidad y nivel de concurrencia configurables; cada intento
   muestra estado, duración, headers y respuesta.
+- Cancelación de peticiones y límites de memoria para respuestas y documentos
+  OpenAPI.
 - Sincronización desde documentos OpenAPI 3 / Swagger 2.
 - Descubrimiento offline de controladores ASP.NET Core y Minimal APIs C#.
 - Colecciones JSON versionables y compartibles mediante Git.
@@ -22,7 +24,7 @@ endpoints de APIs ASP.NET Core sin salir del espacio de trabajo.
 ## Requisitos
 
 - VS Code 1.85 o posterior.
-- Node.js 18 o posterior para desarrollar la extensión.
+- Node.js 20 o posterior para desarrollar y empaquetar la extensión.
 
 ## Desarrollo local
 
@@ -76,8 +78,11 @@ Cada colección es un JSON con versión explícita. Este es un ejemplo mínimo:
 ```
 
 Los cambios realizados en la interfaz se guardan directamente en el archivo.
-Los valores de un entorno forman parte de dicho archivo, por lo que no debes
-incluir tokens, contraseñas ni otros secretos en colecciones compartidas.
+Marca una variable como **secreto** para guardar su valor en `SecretStorage`
+de VS Code; el archivo conserva únicamente el nombre y un valor vacío. Para
+headers de autenticación usa una variable secreta, por ejemplo
+`Authorization: Bearer {{accessToken}}`, en vez de escribir el token
+directamente en la petición.
 
 Para editar los valores, abre **Variables** junto al selector de entorno en la
 esquina superior derecha. Por ejemplo, una petición con
@@ -88,7 +93,7 @@ URL configurada para `apiUrl` en el entorno seleccionado.
 
 EasyRequest sustituye únicamente tokens literales con la forma
 `{{variable}}`; no evalúa código ni expresiones. Si una variable no existe, la
-petición se envía conservando el token y la interfaz muestra una advertencia.
+petición se bloquea para evitar enviar una URL o credencial incompleta.
 
 Las solicitudes se ejecutan en el proceso de la extensión. El timeout por
 defecto es de 30 segundos y se puede ajustar en la configuración de VS Code.
@@ -100,9 +105,10 @@ En el constructor de peticiones indica:
 1. **Solicitudes**: cuántas veces se ejecutará la misma petición.
 2. **En paralelo**: máximo de solicitudes activas al mismo tiempo.
 
-El límite global de una ráfaga es 100 solicitudes por defecto. El panel de
+El límite global de una ráfaga es 100 solicitudes por defecto, con un techo de
+seguridad de 500 y hasta 20 solicitudes simultáneas. El panel de
 respuesta permite abrir cada resultado individual y muestra el tiempo total de
-la ejecución.
+la ejecución. Puedes cancelar una ráfaga en curso.
 
 ## Descubrimiento de endpoints
 
@@ -147,6 +153,7 @@ atributos personalizados.
 | --- | ---: | --- |
 | `easyrequest.requestTimeoutMs` | `30000` | Tiempo máximo de una petición HTTP en milisegundos. |
 | `easyrequest.maxBatchRequests` | `100` | Máximo de solicitudes que puede contener una ráfaga. |
+| `easyrequest.maxResponseSizeKb` | `1024` | Máximo conservado por respuesta; el contenido adicional se trunca. |
 
 ## Estructura
 
@@ -156,7 +163,15 @@ src/                         Extension Host (TypeScript)
   services/                  HTTP, variables y descubrimiento
 webview/src/                 Interfaz React/Vite
   components/                Paneles de colección, petición y respuesta
+dist/                        Bundle de producción del Extension Host
+webview/dist/                Bundle de producción del webview
 ```
+
+## Seguridad y soporte
+
+Consulta [SECURITY.md](SECURITY.md) para reportar vulnerabilidades y
+[SUPPORT.md](SUPPORT.md) para soporte general. EasyRequest no ejecuta ni
+compila código del espacio de trabajo durante el descubrimiento C#.
 
 ## Licencia
 

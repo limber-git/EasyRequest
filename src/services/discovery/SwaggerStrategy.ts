@@ -1,5 +1,8 @@
 import { Endpoint, HttpMethod, METHODS, RequestSpec } from "../../types";
+import { readResponseBody } from "../ResponseReader";
 import { DiscoveryResult, IDiscoveryStrategy } from "./IDiscoveryStrategy";
+
+const MAX_SWAGGER_BYTES = 5 * 1024 * 1024;
 
 type OpenApiDocument = {
   openapi?: string;
@@ -59,6 +62,7 @@ export class SwaggerStrategy implements IDiscoveryStrategy {
   public constructor(private readonly swaggerUrl: string) {}
 
   public async discover(): Promise<DiscoveryResult> {
+    this.assertHttpUrl(this.swaggerUrl);
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10000);
     try {
@@ -66,7 +70,11 @@ export class SwaggerStrategy implements IDiscoveryStrategy {
       if (!response.ok) {
         throw new Error(`Swagger devolvió ${response.status} ${response.statusText}.`);
       }
-      const spec = (await response.json()) as OpenApiDocument;
+      const raw = await readResponseBody(response, MAX_SWAGGER_BYTES);
+      if (raw.truncated) {
+        throw new Error("El documento Swagger supera el límite de 5 MiB.");
+      }
+      const spec = JSON.parse(raw.text) as OpenApiDocument;
       if (!spec.paths || typeof spec.paths !== "object") {
         throw new Error("El documento no contiene un objeto 'paths'.");
       }
@@ -163,6 +171,18 @@ export class SwaggerStrategy implements IDiscoveryStrategy {
     return Boolean(value) && !Array.isArray(value);
   }
 
+  private assertHttpUrl(rawUrl: string): void {
+    let url: URL;
+    try {
+      url = new URL(rawUrl);
+    } catch {
+      throw new Error("La URL de Swagger no es válida.");
+    }
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      throw new Error("Swagger sólo admite URLs HTTP o HTTPS.");
+    }
+  }
+
   private requestBodyExample(operation: OpenApiOperation, spec: OpenApiDocument): unknown {
     const content = operation.requestBody?.content;
     const media = content?.["application/json"] ?? Object.entries(content ?? {}).find(([type]) => type.includes("json"))?.[1];
@@ -185,7 +205,10 @@ export class SwaggerStrategy implements IDiscoveryStrategy {
       : undefined;
   }
 
-  private schemaExample(schema: OpenApiSchema, spec: OpenApiDocument, seenReferences: Set<string>): unknown {
+  private schemaExample(schema: OpenApiSchema, spec: OpenApiDocument, seenReferences: Set<string>, depth = 0): unknown {
+    if (depth > 20) {
+      return null;
+    }
     if (schema.example !== undefined) {
       return schema.example;
     }
@@ -204,27 +227,27 @@ export class SwaggerStrategy implements IDiscoveryStrategy {
         return {};
       }
       seenReferences.add(schema.$ref);
-      const example = this.schemaExample(resolved, spec, seenReferences);
+      const example = this.schemaExample(resolved, spec, seenReferences, depth + 1);
       seenReferences.delete(schema.$ref);
       return example;
     }
     if (schema.allOf?.length) {
       return schema.allOf.reduce<Record<string, unknown>>((result, item) => {
-        const example = this.schemaExample(item, spec, seenReferences);
+        const example = this.schemaExample(item, spec, seenReferences, depth + 1);
         return example && typeof example === "object" && !Array.isArray(example)
           ? { ...result, ...(example as Record<string, unknown>) }
           : result;
       }, {});
     }
     if (schema.oneOf?.length || schema.anyOf?.length) {
-      return this.schemaExample((schema.oneOf ?? schema.anyOf)![0], spec, seenReferences);
+      return this.schemaExample((schema.oneOf ?? schema.anyOf)![0], spec, seenReferences, depth + 1);
     }
     if (schema.type === "array") {
-      return [this.schemaExample(schema.items ?? {}, spec, seenReferences)];
+      return [this.schemaExample(schema.items ?? {}, spec, seenReferences, depth + 1)];
     }
     if (schema.type === "object" || schema.properties) {
       return Object.fromEntries(
-        Object.entries(schema.properties ?? {}).map(([name, property]) => [name, this.schemaExample(property, spec, seenReferences)])
+        Object.entries(schema.properties ?? {}).map(([name, property]) => [name, this.schemaExample(property, spec, seenReferences, depth + 1)])
       );
     }
     if (schema.type === "integer" || schema.type === "number") {

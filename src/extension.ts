@@ -2,11 +2,11 @@ import * as vscode from "vscode";
 import { EasyRequestEditorProvider } from "./editors/EasyRequestEditorProvider";
 
 export function activate(context: vscode.ExtensionContext): void {
-  const provider = new EasyRequestEditorProvider(context.extensionUri);
+  const provider = new EasyRequestEditorProvider(context);
   context.subscriptions.push(
     provider,
     vscode.window.registerCustomEditorProvider(EasyRequestEditorProvider.viewType, provider, {
-      webviewOptions: { retainContextWhenHidden: true },
+      webviewOptions: { retainContextWhenHidden: false },
       supportsMultipleEditorsPerDocument: false
     }),
     vscode.commands.registerCommand("easyrequest.newCollection", () => provider.createCollection())

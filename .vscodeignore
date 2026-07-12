@@ -1,0 +1,17 @@
+.agents/**
+.github/**
+.vscode/**
+node_modules/**
+src/**
+out/**
+webview/src/**
+webview/tsconfig.json
+webview/vite.config.ts
+tsconfig.json
+eslint.config.mjs
+security_best_practices_report.md
+package-lock.json
+.gitignore
+.vscodeignore
+pruebas*.erequest
+**/*.map
