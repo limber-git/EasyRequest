@@ -61,7 +61,7 @@ function FolderNode(props: CollectionTreeNodeProps & { folder: CollectionFolder 
         {isEditing ? (
           <RenameInput {...props} nodeId={folder.id} />
         ) : (
-          <button className="tree-node-label" onDoubleClick={() => props.onStartRename(folder.id, folder.name)}>{folder.name || "Sin nombre"}</button>
+          <button className="tree-node-label" role="treeitem" aria-level={depth + 1} aria-expanded={expanded} onDoubleClick={() => props.onStartRename(folder.id, folder.name)} onKeyDown={(event) => handleFolderKey(event, expanded, () => props.onToggle(folder.id), () => props.onStartRename(folder.id, folder.name))}>{folder.name || "Sin nombre"}</button>
         )}
         <div className="tree-row-actions" onClick={(event) => event.stopPropagation()}>
           <TreeAction label="Nueva petición" icon="new-file" onClick={() => props.onCreateRequest(folder.id)} />
@@ -69,7 +69,7 @@ function FolderNode(props: CollectionTreeNodeProps & { folder: CollectionFolder 
           <TreeAction label="Eliminar carpeta" icon="trash" onClick={() => props.onDelete(folder.id)} />
         </div>
       </div>
-      {expanded && folder.children.map((child) => <CollectionTreeNode key={child.id} {...props} node={child} depth={depth + 1} matchesSearch={matchesSearch} />)}
+      {expanded && <div role="group">{folder.children.map((child) => <CollectionTreeNode key={child.id} {...props} node={child} depth={depth + 1} matchesSearch={matchesSearch} />)}</div>}
     </section>
   );
 }
@@ -87,7 +87,7 @@ function RequestNode(props: CollectionTreeNodeProps): JSX.Element {
       {isEditing ? <>
         <span className={`method method-${node.request.method.toLowerCase()}`}>{node.request.method}</span>
         <RenameInput {...props} nodeId={node.id} />
-      </> : <button className="tree-request-button" onClick={() => props.onSelect(node.id)} onDoubleClick={() => props.onStartRename(node.id, node.name)}>
+      </> : <button className="tree-request-button" role="treeitem" aria-level={depth + 1} aria-selected={node.id === activeId} onClick={() => props.onSelect(node.id)} onDoubleClick={() => props.onStartRename(node.id, node.name)} onKeyDown={(event) => { if (event.key === "F2") { event.preventDefault(); props.onStartRename(node.id, node.name); } }}>
         <span className={`method method-${node.request.method.toLowerCase()}`}>{node.request.method}</span>
         <span className="endpoint-name">{node.name || "Sin nombre"}</span>
       </button>}
@@ -107,6 +107,17 @@ function RenameInput({ editing, onRenameTextChange, onSaveRename, onCancelRename
     }
   };
   return <input className="tree-node-editing" value={editing?.text ?? ""} autoFocus onChange={(event) => onRenameTextChange(event.target.value)} onBlur={() => onSaveRename(nodeId)} onKeyDown={handleKeyDown} onClick={(event) => event.stopPropagation()} />;
+}
+
+function handleFolderKey(event: KeyboardEvent<HTMLButtonElement>, expanded: boolean, toggle: () => void, rename: () => void): void {
+  if ((event.key === "ArrowRight" && !expanded) || (event.key === "ArrowLeft" && expanded)) {
+    event.preventDefault();
+    toggle();
+  }
+  if (event.key === "F2") {
+    event.preventDefault();
+    rename();
+  }
 }
 
 function TreeAction({ label, icon, onClick }: { label: string; icon: "new-file" | "new-folder" | "trash"; onClick(): void }): JSX.Element {

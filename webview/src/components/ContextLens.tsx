@@ -117,12 +117,6 @@ function computeResolution(
   };
 }
 
-const STATUS_DOT: Record<Resolution["status"], string> = {
-  green: "🟢",
-  yellow: "🟡",
-  red: "🔴",
-};
-
 export function ContextLens({
   root,
   requestId,
@@ -145,42 +139,25 @@ export function ContextLens({
         {ancestors.map((ancestor, index) => (
           <span key={ancestor.folderId}>
             {index > 0 && <span aria-hidden="true"> › </span>}
-            <span
+            <button
               className="context-lens-folder-link"
-              role="button"
-              tabIndex={0}
               onClick={() => onEditFolderBaseUrl?.(ancestor.folderId)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  onEditFolderBaseUrl?.(ancestor.folderId);
-                }
-              }}
+              aria-label={`Editar URL base de ${ancestor.folderName}`}
             >
               {ancestor.folderName}
-              {ancestor.baseUrl != null && (
-                <span className="context-lens-base-hint" title={ancestor.baseUrl}>
-                  {" "}⬡
-                </span>
-              )}
-            </span>
+            </button>
           </span>
         ))}
         {environment && (
           <>
             {ancestors.length > 0 && <span aria-hidden="true"> › </span>}
-            <span
+            <button
               className="context-lens-env-link"
-              role="button"
-              tabIndex={0}
               onClick={() => onOpenEnvironment?.()}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  onOpenEnvironment?.();
-                }
-              }}
+              aria-label={`Abrir variables del entorno ${environment.name}`}
             >
               {environment.name}
-            </span>
+            </button>
           </>
         )}
       </div>
@@ -205,7 +182,8 @@ export function ContextLens({
 
       {/* Status indicator */}
       <span
-        className="context-lens-status"
+        className={`context-lens-status ${status}`}
+        role="status"
         title={
           status === "green"
             ? "All variables resolved"
@@ -220,9 +198,7 @@ export function ContextLens({
               ? "Some variables are missing"
               : "No base URL configured"
         }
-      >
-        {STATUS_DOT[status]}
-      </span>
+      />
     </div>
   );
 }

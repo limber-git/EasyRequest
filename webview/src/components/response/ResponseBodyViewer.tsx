@@ -1,7 +1,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { VSCodeIcon } from "../icons/VSCodeIcon";
 
-export function ResponseBodyViewer({ body }: { body: string }): JSX.Element {
+export function ResponseBodyViewer({ body, onCopy }: { body: string; onCopy(text: string): void }): JSX.Element {
   const [search, setSearch] = useState("");
   const formattedBody = useMemo(() => formatBody(body), [body]);
   const { highlighted, matchCount } = useMemo(() => highlight(formattedBody, search), [formattedBody, search]);
@@ -10,7 +10,7 @@ export function ResponseBodyViewer({ body }: { body: string }): JSX.Element {
     <div className="json-search">
       <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar en el body" aria-label="Buscar en el body" />
       {search && <span className="json-search-count">{matchCount} coincidencias</span>}
-      <button className="copy-button" onClick={() => void navigator.clipboard.writeText(body)} title="Copiar body" aria-label="Copiar body al portapapeles"><VSCodeIcon name="copy" /></button>
+      <button className="copy-button" onClick={() => onCopy(body)} title="Copiar body" aria-label="Copiar body al portapapeles"><VSCodeIcon name="copy" /></button>
     </div>
     <pre className="response-body" tabIndex={0} aria-label="Body de respuesta JSON">{highlighted}</pre>
   </>;

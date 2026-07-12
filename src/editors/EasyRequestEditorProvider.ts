@@ -2,7 +2,7 @@ import { randomBytes } from "crypto";
 import * as vscode from "vscode";
 import { createDefaultDocument } from "../defaultDocument";
 import { CollectionSecrets } from "../services/CollectionSecrets";
-import { discoveredVariables, DiscoveredService, replaceDiscoveryFolder, requestWithContext } from "../services/CollectionTree";
+import { discoveredVariables, DiscoveredService, findFolderNode, replaceDiscoveryFolder, requestWithContext, updateFolderBaseUrl } from "../services/CollectionTree";
 import { DiscoveryContext } from "../services/discovery/DiscoveryContext";
 import { DocumentCodec } from "../services/DocumentCodec";
 import { EnvResolver } from "../services/EnvResolver";
@@ -15,6 +15,8 @@ type WebviewMessage =
   | { type: "saveCopy"; document: unknown }
   | { type: "executeRequest"; document: unknown; requestId: string; environmentId?: string; total: number; concurrency: number }
   | { type: "cancelRequest" }
+  | { type: "editFolderBaseUrl"; folderId: string }
+  | { type: "copyToClipboard"; text: string }
   | { type: "discover"; swaggerUrl?: string }
   | { type: "discoverDotNet" };
 
@@ -121,6 +123,13 @@ export class EasyRequestEditorProvider implements vscode.CustomTextEditorProvide
         case "cancelRequest":
           this.cancelRequests(webview);
           this.post(webview, { type: "requestCancelled" });
+          return;
+        case "editFolderBaseUrl":
+          await this.enqueueMutation(textDocument.uri, () => this.editFolderBaseUrl(textDocument, webview, message.folderId));
+          return;
+        case "copyToClipboard":
+          await vscode.env.clipboard.writeText(message.text);
+          this.post(webview, { type: "clipboardCopied" });
           return;
         case "discover":
           await this.enqueueMutation(textDocument.uri, () => this.discoverEndpoints(textDocument, webview, message.swaggerUrl));
@@ -233,6 +242,21 @@ export class EasyRequestEditorProvider implements vscode.CustomTextEditorProvide
     });
   }
 
+  private async editFolderBaseUrl(textDocument: vscode.TextDocument, webview: vscode.Webview, folderId: string): Promise<void> {
+    const document = await this.readHydratedDocument(textDocument);
+    const folder = findFolderNode(document.root, folderId);
+    if (!folder) throw new Error("La carpeta seleccionada ya no existe.");
+    const value = await vscode.window.showInputBox({
+      title: "EasyRequest: URL base de carpeta",
+      prompt: `URL base para “${folder.name}”. Déjala vacía para heredar la URL superior.`,
+      value: folder.baseUrl ?? "",
+      placeHolder: "{{apiUrl}} o https://api.example.com"
+    });
+    if (value === undefined) return;
+    await this.writeDocument(textDocument, { ...document, root: updateFolderBaseUrl(document.root, folderId, value.trim() || undefined) });
+    await this.postDocument(webview, textDocument);
+  }
+
   private async discoverDotNet(textDocument: vscode.TextDocument, webview: vscode.Webview): Promise<void> {
     const root = this.workspaceRoot(textDocument.uri);
     if (!root) {
@@ -321,6 +345,12 @@ export class EasyRequestEditorProvider implements vscode.CustomTextEditorProvide
       case "cancelRequest":
       case "discoverDotNet":
         return { type: raw.type };
+      case "editFolderBaseUrl":
+        if (typeof raw.folderId !== "string" || raw.folderId.length > 500) throw new Error("El identificador de carpeta es inválido.");
+        return { type: "editFolderBaseUrl", folderId: raw.folderId };
+      case "copyToClipboard":
+        if (typeof raw.text !== "string" || raw.text.length > 2 * 1024 * 1024) throw new Error("El texto a copiar es inválido o demasiado grande.");
+        return { type: "copyToClipboard", text: raw.text };
       case "discover":
         if (raw.swaggerUrl !== undefined && typeof raw.swaggerUrl !== "string") {
           throw new Error("La URL de Swagger es inválida.");

@@ -59,7 +59,7 @@ input:focus, select:focus { outline: 1px solid var(--vscode-focusBorder); outlin
 .tree-folder.is-drop-target > .tree-row { outline: 1px dashed var(--vscode-focusBorder); outline-offset: -1px; background: var(--vscode-list-dropBackground, var(--vscode-list-hoverBackground)); }
 .endpoint-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .method { width: 40px; flex: none; font-size: .73em; font-weight: 700; }
-.method-get { color: #55c26b; }.method-post { color: #54a9ff; }.method-put { color: #d6a44a; }.method-patch { color: #b28bff; }.method-delete { color: #e66565; }.method-head, .method-options { color: var(--vscode-descriptionForeground); }
+.method-get { color: var(--vscode-charts-green, var(--vscode-foreground)); }.method-post { color: var(--vscode-charts-blue, var(--vscode-foreground)); }.method-put { color: var(--vscode-charts-yellow, var(--vscode-foreground)); }.method-patch { color: var(--vscode-charts-purple, var(--vscode-foreground)); }.method-delete { color: var(--vscode-charts-red, var(--vscode-foreground)); }.method-head, .method-options { color: var(--vscode-descriptionForeground); }
 .empty-copy, .response-empty { padding: 14px; color: var(--vscode-descriptionForeground); line-height: 1.5; }
 .icon-button { padding: 0 5px; border: 0; background: transparent; color: inherit; font-size: 18px; line-height: 22px; }
 .icon-button:hover { background: var(--vscode-toolbar-hoverBackground); }
@@ -90,9 +90,9 @@ input:focus, select:focus { outline: 1px solid var(--vscode-focusBorder); outlin
 .context-lens-arrow { color: var(--vscode-descriptionForeground); margin-right: 4px; }
 .context-lens-missing-var { color: var(--vscode-editorWarning-foreground); font-weight: 700; }
 .context-lens-status { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
-.context-lens-status.green { background: var(--vscode-testing-iconPassed, #55c26b); }
-.context-lens-status.yellow { background: var(--vscode-editorWarning-foreground, #d6a44a); }
-.context-lens-status.red { background: var(--vscode-testing-iconFailed, #e66565); }
+.context-lens-status.green { background: var(--vscode-testing-iconPassed, var(--vscode-charts-green)); }
+.context-lens-status.yellow { background: var(--vscode-editorWarning-foreground, var(--vscode-charts-yellow)); }
+.context-lens-status.red { background: var(--vscode-testing-iconFailed, var(--vscode-charts-red)); }
 
 /* ── Tree search ── */
 
@@ -122,8 +122,8 @@ input:focus, select:focus { outline: 1px solid var(--vscode-focusBorder); outlin
 .contract-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-weight: 600; font-size: .88em; }
 .contract-validation { display: flex; align-items: baseline; gap: 8px; padding: 4px 0; font-size: .85em; line-height: 1.4; }
 .contract-validation .icon { flex: none; width: 16px; text-align: center; font-weight: 700; }
-.contract-validation.pass .icon { color: var(--vscode-testing-iconPassed, #55c26b); }
-.contract-validation.fail .icon { color: var(--vscode-testing-iconFailed, #e66565); }
+.contract-validation.pass .icon { color: var(--vscode-testing-iconPassed, var(--vscode-charts-green)); }
+.contract-validation.fail .icon { color: var(--vscode-testing-iconFailed, var(--vscode-charts-red)); }
 .contract-validation.neutral .icon { color: var(--vscode-descriptionForeground); }
 .contract-actions { display: flex; gap: 8px; margin-top: 10px; }
 .contract-empty { padding: 10px; color: var(--vscode-descriptionForeground); font-size: .85em; line-height: 1.5; }

@@ -78,7 +78,7 @@ export function EndpointTree(props: EndpointTreeProps): JSX.Element {
       <div className="tree-search">
         <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar en la colección" aria-label="Buscar en la colección" />
       </div>
-      <div className="tree-scroll" onDragOver={(event) => event.preventDefault()} onDrop={(event) => handleDrop(event, root.id)}>
+      <div className="tree-scroll" role="tree" aria-label="Colección de peticiones" onDragOver={(event) => event.preventDefault()} onDrop={(event) => handleDrop(event, root.id)}>
         {root.children.map((node) => (
           <CollectionTreeNode
             key={node.id}

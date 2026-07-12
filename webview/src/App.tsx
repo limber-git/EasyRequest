@@ -1,6 +1,6 @@
-import { useCallback, useEffect, type CSSProperties } from "react";
+import { useCallback, type CSSProperties } from "react";
 import type { CollectionFolder, EasyRequestDocument, Environment, RequestContract, RequestSpec } from "../../src/types";
-import { addFolder, addRequestToFolder, findRequestNode, removeRequestNode, requestIds, renameNode, updateFolderBaseUrl, updateRequestNode, moveNode } from "../../src/services/CollectionTree";
+import { addFolder, addRequestToFolder, findRequestNode, removeRequestNode, requestIds, renameNode, updateRequestNode, moveNode } from "../../src/services/CollectionTree";
 import { EndpointTree } from "./components/EndpointTree";
 import { EnvironmentEditor } from "./components/EnvironmentEditor";
 import { RequestPanel } from "./components/RequestPanel";
@@ -52,16 +52,6 @@ export function App(): JSX.Element {
     vscode.postMessage({ type: "executeRequest", document: state.documentRef.current, requestId: activeRequest.id, environmentId: state.documentRef.current.selectedEnvironmentId, total, concurrency });
   }, [activeRequest, state, vscode]);
 
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (!(event.ctrlKey || event.metaKey)) return;
-      const selector = event.key === "p" ? ".tree-search input" : event.key === "k" ? ".url-input" : undefined;
-      if (selector) { event.preventDefault(); (window.document.querySelector(selector) as HTMLElement | null)?.focus(); }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
-
   if (state.loadError) return <main className="fatal-error"><h1>No se pudo abrir la colección</h1><p>{state.loadError}</p><p>El archivo no fue modificado. Corrige el JSON en el editor de texto o restaura una copia válida.</p></main>;
 
   return <div className="app-shell">
@@ -71,9 +61,9 @@ export function App(): JSX.Element {
     <div ref={workspaceRef} className={`workspace-grid${isResizing ? " is-resizing" : ""}`} style={{ "--collection-width": `${paneWidths.collection}px`, "--response-width": `${paneWidths.response}px` } as CSSProperties}>
       <EndpointTree root={state.document.root} activeId={activeRequest?.id ?? ""} onSelect={state.setActiveRequestId} onNew={createRequest} onNewFolder={createFolder} onDelete={deleteNode} onRename={(id, name) => state.updateDocument((current) => ({ ...current, root: renameNode(current.root, id, name) }))} onMove={(nodeId, targetId, index) => state.updateDocument((current) => ({ ...current, root: moveNode(current.root, nodeId, targetId, index) }))} />
       <PaneSplitter label="Redimensionar colección" side="collection" startResize={startResize} moveResize={moveResize} finishResize={finishResize} resizePane={resizePane} />
-      {activeRequest ? <RequestPanel key={activeRequest.id} request={activeRequest} root={state.document.root} environment={activeEnvironment} onChange={updateRequest} onExecute={execute} onCancel={() => vscode.postMessage({ type: "cancelRequest" })} running={state.running} onEditFolderBaseUrl={(id) => editFolderBaseUrl(state.document.root, id, state.updateDocument)} onOpenEnvironment={() => { const editor = window.document.querySelector(".environment-editor") as HTMLDetailsElement | null; if (editor) editor.open = true; }} /> : <main className="request-panel"><div className="response-empty">Crea o selecciona una petición para empezar.</div></main>}
+      {activeRequest ? <RequestPanel key={activeRequest.id} request={activeRequest} root={state.document.root} environment={activeEnvironment} onChange={updateRequest} onExecute={execute} onCancel={() => vscode.postMessage({ type: "cancelRequest" })} running={state.running} onEditFolderBaseUrl={(folderId) => { state.flushSave(); vscode.postMessage({ type: "editFolderBaseUrl", folderId }); }} onOpenEnvironment={() => { const editor = window.document.querySelector(".environment-editor") as HTMLDetailsElement | null; if (editor) editor.open = true; }} /> : <main className="request-panel"><div className="response-empty">Crea o selecciona una petición para empezar.</div></main>}
       <PaneSplitter label="Redimensionar respuesta" side="response" startResize={startResize} moveResize={moveResize} finishResize={finishResize} resizePane={resizePane} />
-      <ResponsePanel batch={state.batch} contract={state.document.contracts?.find((item) => item.requestId === activeRequest?.id)} requestId={activeRequest?.id ?? ""} onSaveContract={saveContract} onDeleteContract={deleteContract} />
+      <ResponsePanel batch={state.batch} contract={state.document.contracts?.find((item) => item.requestId === activeRequest?.id)} requestId={activeRequest?.id ?? ""} onSaveContract={saveContract} onDeleteContract={deleteContract} onCopy={(text) => vscode.postMessage({ type: "copyToClipboard", text })} />
     </div>
   </div>;
 }
@@ -84,17 +74,4 @@ function AppHeader({ swaggerUrl, onSwaggerUrlChange, document, onDiscover, onDis
 
 function PaneSplitter({ label, side, startResize, moveResize, finishResize, resizePane }: { label: string; side: "collection" | "response"; startResize: ReturnType<typeof usePaneResize>["startResize"]; moveResize: ReturnType<typeof usePaneResize>["moveResize"]; finishResize: ReturnType<typeof usePaneResize>["finishResize"]; resizePane: ReturnType<typeof usePaneResize>["resizePane"] }): JSX.Element {
   return <div className="pane-splitter" role="separator" aria-label={label} aria-orientation="vertical" tabIndex={0} onPointerDown={(event) => startResize(side, event)} onPointerMove={(event) => moveResize(side, event)} onPointerUp={finishResize} onPointerCancel={finishResize} onKeyDown={(event) => { if (event.key === "ArrowLeft" || event.key === "ArrowRight") { event.preventDefault(); resizePane(side, event.key === "ArrowLeft" ? -RESIZE_STEP : RESIZE_STEP); } }} />;
-}
-
-function editFolderBaseUrl(root: CollectionFolder, folderId: string, updateDocument: (updater: (document: EasyRequestDocument) => EasyRequestDocument) => void): void {
-  const folder = findFolder(root, folderId);
-  if (!folder) return;
-  const next = window.prompt(`Editar URL base para la carpeta "${folder.name}":`, folder.baseUrl ?? "");
-  if (next !== null) updateDocument((document) => ({ ...document, root: updateFolderBaseUrl(document.root, folderId, next || undefined) }));
-}
-
-function findFolder(node: CollectionFolder, id: string): CollectionFolder | undefined {
-  if (node.id === id) return node;
-  for (const child of node.children) if (child.type === "folder") { const match = findFolder(child, id); if (match) return match; }
-  return undefined;
 }

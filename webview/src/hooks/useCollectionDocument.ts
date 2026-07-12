@@ -10,6 +10,7 @@ type HostMessage =
   | { type: "documentConflict"; document: EasyRequestDocument; revision: number; requestId?: number }
   | { type: "batchResult"; batch: BatchResult }
   | { type: "requestCancelled" }
+  | { type: "clipboardCopied" }
   | { type: "copySaved" }
   | { type: "error" | "warning"; message: string }
   | { type: "discoveryComplete"; source: string; count: number; baseUrl?: string; warning?: string };
@@ -22,7 +23,7 @@ const isHostMessage = (value: unknown): value is HostMessage => {
   if (value.type === "saveComplete") return typeof value.requestId === "number" && typeof value.revision === "number";
   if (value.type === "documentConflict") return isRecord(value.document) && typeof value.revision === "number";
   if (value.type === "batchResult") return isRecord(value.batch) && Array.isArray(value.batch.results);
-  if (["requestCancelled", "copySaved"].includes(value.type)) return true;
+  if (["requestCancelled", "copySaved", "clipboardCopied"].includes(value.type)) return true;
   return value.type === "discoveryComplete" && typeof value.source === "string" && typeof value.count === "number";
 };
 
@@ -108,6 +109,7 @@ export function useCollectionDocument(vscode: VsCodeApi) {
           saveInFlight.current = undefined; conflictRef.current = { document: message.document, revision: message.revision }; setConflict(conflictRef.current); setNotice("Se evitó sobrescribir una modificación externa de la colección."); break;
         case "batchResult": setBatch(message.batch); setRunning(false); break;
         case "requestCancelled": setRunning(false); setNotice("Petición cancelada."); break;
+        case "clipboardCopied": setNotice("Body copiado al portapapeles."); break;
         case "copySaved":
           setNotice("La edición local se guardó como una nueva colección.");
           if (conflictRef.current) {

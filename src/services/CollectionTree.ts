@@ -20,6 +20,17 @@ export const findRequestNode = (node: CollectionNode, id: string): CollectionReq
   return undefined;
 };
 
+export const findFolderNode = (node: CollectionFolder, id: string): CollectionFolder | undefined => {
+  if (node.id === id) return node;
+  for (const child of node.children) {
+    if (child.type === "folder") {
+      const match = findFolderNode(child, id);
+      if (match) return match;
+    }
+  }
+  return undefined;
+};
+
 export const requestIds = (node: CollectionNode): string[] => node.type === "request"
   ? [node.id]
   : node.children.flatMap(requestIds);

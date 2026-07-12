@@ -8,9 +8,10 @@ interface ResponsePanelProps {
   requestId: string;
   onSaveContract?(contract: RequestContract): void;
   onDeleteContract?(): void;
+  onCopy(text: string): void;
 }
 
-export function ResponsePanel({ batch, contract, requestId, onSaveContract, onDeleteContract }: ResponsePanelProps): JSX.Element {
+export function ResponsePanel({ batch, contract, requestId, onSaveContract, onDeleteContract, onCopy }: ResponsePanelProps): JSX.Element {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [tab, setTab] = useState<ResponseTab>("body");
   const selected = batch?.results.find((result) => result.index === selectedIndex) ?? batch?.results[0];
@@ -21,7 +22,7 @@ export function ResponsePanel({ batch, contract, requestId, onSaveContract, onDe
       <div className="batch-summary"><strong>{successCount}/{batch.results.length}</strong> correctas<span>{batch.totalDurationMs} ms total</span></div>
       <div className="batch-results" aria-label="Resultados de la ráfaga">{batch.results.map((result) => <button key={result.index} className={selected?.index === result.index ? "selected" : ""} onClick={() => setSelectedIndex(result.index)}><span>#{result.index + 1}</span><span className={`status ${result.ok ? "success" : "failure"}`}>{result.status ?? "ERR"}</span><span>{result.durationMs} ms</span></button>)}</div>
       <ResponseTabs active={tab} onSelect={setTab} />
-      {selected && <ResponseDetails result={selected} tab={tab} contract={contract} requestId={requestId} onSaveContract={onSaveContract} onDeleteContract={onDeleteContract} />}
+      {selected && <ResponseDetails result={selected} tab={tab} contract={contract} requestId={requestId} onSaveContract={onSaveContract} onDeleteContract={onDeleteContract} onCopy={onCopy} />}
     </>}
   </aside>;
 }
