@@ -1,0 +1,220 @@
+{
+  "version": 1,
+  "selectedEnvironmentId": "default",
+  "environments": [
+    {
+      "id": "default",
+      "name": "Default",
+      "variables": {
+        "apiUrl": "http://localhost:5025",
+        "nuevaVariable": ""
+      }
+    }
+  ],
+  "requests": [
+    {
+      "id": "request-1",
+      "name": "Nueva petición",
+      "method": "GET",
+      "url": "{{apiUrl}}/get",
+      "headers": [],
+      "params": [
+        {
+          "key": "apiUrl",
+          "value": "http://localhost:5025",
+          "enabled": true
+        }
+      ],
+      "body": "",
+      "bodyType": "none"
+    },
+    {
+      "id": "POST:/api/requests",
+      "name": "POST /api/requests",
+      "method": "POST",
+      "url": "{{apiUrl}}/api/requests",
+      "headers": [],
+      "params": [],
+      "body": "{\n  \"title\": \"string\",\n  \"description\": \"string\",\n  \"requestedBy\": \"string\"\n}",
+      "bodyType": "json"
+    },
+    {
+      "id": "GET:/api/requests/{id}",
+      "name": "GET /api/requests/{id}",
+      "method": "GET",
+      "url": "{{apiUrl}}/api/requests/{{id}}",
+      "headers": [],
+      "params": [
+        {
+          "key": "id",
+          "value": "2d3fb8cf-7eab-42b7-927e-fc8bb31e0s046",
+          "enabled": true,
+          "location": "path"
+        }
+      ],
+      "body": "",
+      "bodyType": "none"
+    },
+    {
+      "id": "PATCH:/api/requests/{id}/status",
+      "name": "PATCH /api/requests/{id}/status",
+      "method": "PATCH",
+      "url": "{{apiUrl}}/api/requests/{{id}}/status",
+      "headers": [],
+      "params": [
+        {
+          "key": "id",
+          "value": "01d5adee-d0bb-4c02-b9eb-333f30a2b06a",
+          "enabled": true,
+          "location": "path"
+        },
+        {
+          "key": "",
+          "value": "",
+          "enabled": true
+        }
+      ],
+      "body": "{\n  \"status\": \"Pending\"\n}",
+      "bodyType": "json"
+    },
+    {
+      "id": "101b181c-4e6e-45d8-8d0e-5e8b7d6a39a7",
+      "name": "Nueva petición",
+      "method": "GET",
+      "url": "",
+      "headers": [],
+      "params": [],
+      "body": "",
+      "bodyType": "none"
+    },
+    {
+      "id": "3462c235-91f8-4dff-b452-b8dddabff1c2",
+      "name": "Nueva petición",
+      "method": "GET",
+      "url": "",
+      "headers": [],
+      "params": [],
+      "body": "",
+      "bodyType": "none"
+    },
+    {
+      "id": "GET:/api/requests",
+      "name": "GetAll",
+      "method": "GET",
+      "url": "{{apiUrl}}/api/requests",
+      "headers": [],
+      "params": [],
+      "body": "",
+      "bodyType": "none",
+      "group": "ServiceRequests"
+    }
+  ],
+  "endpoints": [
+    {
+      "id": "GET:/",
+      "group": "Minimal APIs",
+      "name": "GET /",
+      "method": "GET",
+      "path": "/",
+      "request": {
+        "id": "GET:/",
+        "name": "GET /",
+        "method": "GET",
+        "url": "{{apiUrl}}/",
+        "headers": [],
+        "params": [],
+        "body": "",
+        "bodyType": "none",
+        "group": "Minimal APIs"
+      }
+    },
+    {
+      "id": "GET:/api/requests",
+      "group": "ServiceRequests",
+      "name": "GetAll",
+      "method": "GET",
+      "path": "/api/requests",
+      "request": {
+        "id": "GET:/api/requests",
+        "name": "GetAll",
+        "method": "GET",
+        "url": "{{apiUrl}}/api/requests",
+        "headers": [],
+        "params": [],
+        "body": "",
+        "bodyType": "none",
+        "group": "ServiceRequests"
+      }
+    },
+    {
+      "id": "POST:/api/requests",
+      "group": "ServiceRequests",
+      "name": "Create",
+      "method": "POST",
+      "path": "/api/requests",
+      "request": {
+        "id": "POST:/api/requests",
+        "name": "Create",
+        "method": "POST",
+        "url": "{{apiUrl}}/api/requests",
+        "headers": [],
+        "params": [],
+        "body": "",
+        "bodyType": "none",
+        "group": "ServiceRequests"
+      }
+    },
+    {
+      "id": "GET:/api/requests/{id:guid}",
+      "group": "ServiceRequests",
+      "name": "GetById",
+      "method": "GET",
+      "path": "/api/requests/{id:guid}",
+      "request": {
+        "id": "GET:/api/requests/{id:guid}",
+        "name": "GetById",
+        "method": "GET",
+        "url": "{{apiUrl}}/api/requests/{{id}}",
+        "headers": [],
+        "params": [
+          {
+            "key": "id",
+            "value": "",
+            "enabled": true,
+            "location": "path"
+          }
+        ],
+        "body": "",
+        "bodyType": "none",
+        "group": "ServiceRequests"
+      }
+    },
+    {
+      "id": "PATCH:/api/requests/{id:guid}/status",
+      "group": "ServiceRequests",
+      "name": "UpdateStatus",
+      "method": "PATCH",
+      "path": "/api/requests/{id:guid}/status",
+      "request": {
+        "id": "PATCH:/api/requests/{id:guid}/status",
+        "name": "UpdateStatus",
+        "method": "PATCH",
+        "url": "{{apiUrl}}/api/requests/{{id}}/status",
+        "headers": [],
+        "params": [
+          {
+            "key": "id",
+            "value": "",
+            "enabled": true,
+            "location": "path"
+          }
+        ],
+        "body": "",
+        "bodyType": "none",
+        "group": "ServiceRequests"
+      }
+    }
+  ],
+  "swaggerUrl": "http://localhost:5025/swagger/v1/swagger.json",
+  "discoverySource": "dotnet"
+}

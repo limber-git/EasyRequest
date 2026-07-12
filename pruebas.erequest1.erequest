@@ -1,0 +1,167 @@
+{
+  "version": 1,
+  "selectedEnvironmentId": "default",
+  "environments": [
+    {
+      "id": "default",
+      "name": "Default",
+      "variables": {
+        "apiUrl": "https://httpbin.org"
+      }
+    }
+  ],
+  "requests": [
+    {
+      "id": "request-1",
+      "name": "Nueva petición",
+      "method": "GET",
+      "url": "{{apiUrl}}/get",
+      "headers": [],
+      "params": [],
+      "body": "",
+      "bodyType": "none"
+    },
+    {
+      "id": "GET:/api/requests",
+      "name": "GetAll",
+      "method": "GET",
+      "url": "http://localhost:7223/api/requests",
+      "headers": [],
+      "params": [],
+      "body": "",
+      "bodyType": "none",
+      "group": "ServiceRequests"
+    },
+    {
+      "id": "POST:/api/requests",
+      "name": "Create",
+      "method": "POST",
+      "url": "https://localhost:5025/api/requests",
+      "headers": [],
+      "params": [],
+      "body": "",
+      "bodyType": "json",
+      "group": "ServiceRequests"
+    },
+    {
+      "id": "GET:/api/requests/{id:guid}",
+      "name": "GetById",
+      "method": "GET",
+      "url": "/api/requests/{{id}}",
+      "headers": [],
+      "params": [],
+      "body": "",
+      "bodyType": "none",
+      "group": "ServiceRequests"
+    },
+    {
+      "id": "PATCH:/api/requests/{id:guid}/status",
+      "name": "UpdateStatus",
+      "method": "PATCH",
+      "url": "/api/requests/{{id}}/status",
+      "headers": [],
+      "params": [],
+      "body": "",
+      "bodyType": "none",
+      "group": "ServiceRequests"
+    },
+    {
+      "id": "PATCH:/api/requests/{id}/status",
+      "name": "PATCH /api/requests/{id}/status",
+      "method": "PATCH",
+      "url": "http://localhost:5025/api/requests/{{id}}/status",
+      "headers": [],
+      "params": [],
+      "body": "",
+      "bodyType": "none"
+    },
+    {
+      "id": "GET:/api/requests/{id}",
+      "name": "GET /api/requests/{id}",
+      "method": "GET",
+      "url": "http://localhost:5025/api/requests/{{id}}",
+      "headers": [],
+      "params": [
+        {
+          "key": "id",
+          "value": "1",
+          "enabled": true
+        }
+      ],
+      "body": "",
+      "bodyType": "none"
+    }
+  ],
+  "endpoints": [
+    {
+      "id": "GET:/api/requests",
+      "group": "ServiceRequests",
+      "name": "GET /api/requests",
+      "method": "GET",
+      "path": "/api/requests",
+      "request": {
+        "id": "GET:/api/requests",
+        "name": "GET /api/requests",
+        "method": "GET",
+        "url": "http://localhost:5025/api/requests",
+        "headers": [],
+        "params": [],
+        "body": "",
+        "bodyType": "none"
+      }
+    },
+    {
+      "id": "POST:/api/requests",
+      "group": "ServiceRequests",
+      "name": "POST /api/requests",
+      "method": "POST",
+      "path": "/api/requests",
+      "request": {
+        "id": "POST:/api/requests",
+        "name": "POST /api/requests",
+        "method": "POST",
+        "url": "http://localhost:5025/api/requests",
+        "headers": [],
+        "params": [],
+        "body": "",
+        "bodyType": "none"
+      }
+    },
+    {
+      "id": "GET:/api/requests/{id}",
+      "group": "ServiceRequests",
+      "name": "GET /api/requests/{id}",
+      "method": "GET",
+      "path": "/api/requests/{id}",
+      "request": {
+        "id": "GET:/api/requests/{id}",
+        "name": "GET /api/requests/{id}",
+        "method": "GET",
+        "url": "http://localhost:5025/api/requests/{{id}}",
+        "headers": [],
+        "params": [],
+        "body": "",
+        "bodyType": "none"
+      }
+    },
+    {
+      "id": "PATCH:/api/requests/{id}/status",
+      "group": "ServiceRequests",
+      "name": "PATCH /api/requests/{id}/status",
+      "method": "PATCH",
+      "path": "/api/requests/{id}/status",
+      "request": {
+        "id": "PATCH:/api/requests/{id}/status",
+        "name": "PATCH /api/requests/{id}/status",
+        "method": "PATCH",
+        "url": "http://localhost:5025/api/requests/{{id}}/status",
+        "headers": [],
+        "params": [],
+        "body": "",
+        "bodyType": "none"
+      }
+    }
+  ],
+  "swaggerUrl": "http://localhost:5025/swagger/v1/swagger.json",
+  "discoverySource": "swagger"
+}
