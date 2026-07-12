@@ -1,7 +1,7 @@
 import { EasyRequestDocument } from "./types";
 
 export const createDefaultDocument = (): EasyRequestDocument => ({
-  version: 1,
+  version: 2,
   selectedEnvironmentId: "default",
   environments: [
     {
@@ -12,17 +12,25 @@ export const createDefaultDocument = (): EasyRequestDocument => ({
       }
     }
   ],
-  requests: [
-    {
+  root: {
+    id: "root",
+    type: "folder",
+    name: "Colección",
+    baseUrl: "{{apiUrl}}",
+    children: [{
       id: "request-1",
+      type: "request",
       name: "Nueva petición",
-      method: "GET",
-      url: "{{apiUrl}}/get",
-      headers: [],
-      params: [],
-      body: "",
-      bodyType: "none"
-    }
-  ],
-  endpoints: []
+      request: {
+        id: "request-1",
+        name: "Nueva petición",
+        method: "GET",
+        url: "/get",
+        headers: [],
+        params: [],
+        body: "",
+        bodyType: "none"
+      }
+    }]
+  }
 });

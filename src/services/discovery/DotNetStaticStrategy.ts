@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { Endpoint, HttpMethod, METHODS, RequestSpec } from "../../types";
+import { DiscoveredService } from "../CollectionTree";
 import { DiscoveryResult, IDiscoveryStrategy } from "./IDiscoveryStrategy";
 
 /**
@@ -18,7 +19,16 @@ export class DotNetStaticStrategy implements IDiscoveryStrategy {
       "**/{bin,obj}/**",
       500
     );
-    const endpointSets = new Array<Endpoint[]>(files.length);
+    const projectFiles = await vscode.workspace.findFiles(
+      new vscode.RelativePattern(this.workspaceRoot, "**/*.csproj"),
+      "**/{bin,obj}/**",
+      100
+    );
+    const projects = projectFiles.map((uri) => ({
+      name: uri.path.slice(uri.path.lastIndexOf("/") + 1).replace(/\.csproj$/i, ""),
+      directory: uri.with({ path: uri.path.slice(0, uri.path.lastIndexOf("/")) })
+    }));
+    const endpointSets = new Array<{ project: string; endpoints: Endpoint[] }>(files.length);
     let nextIndex = 0;
     let skippedLargeFiles = 0;
     const worker = async () => {
@@ -26,10 +36,10 @@ export class DotNetStaticStrategy implements IDiscoveryStrategy {
         const index = nextIndex++;
         const stat = await vscode.workspace.fs.stat(files[index]);
         if (stat.size > DotNetStaticStrategy.maximumFileBytes) {
-          endpointSets[index] = [];
+          endpointSets[index] = { project: this.projectFor(files[index], projects), endpoints: [] };
           skippedLargeFiles += 1;
         } else {
-          endpointSets[index] = await this.parseFile(files[index]);
+          endpointSets[index] = { project: this.projectFor(files[index], projects), endpoints: await this.parseFile(files[index]) };
         }
       }
     };
@@ -37,21 +47,50 @@ export class DotNetStaticStrategy implements IDiscoveryStrategy {
       { length: Math.min(files.length, DotNetStaticStrategy.maximumConcurrency) },
       () => worker()
     ));
-    const known = new Set<string>();
-    const endpoints = endpointSets.flat().filter((endpoint) => {
-      const key = `${endpoint.method}:${endpoint.path}`;
-      if (known.has(key)) {
-        return false;
-      }
-      known.add(key);
-      return true;
-    });
+    const byProject = new Map<string, Endpoint[]>();
+    endpointSets.forEach((entry) => byProject.set(entry.project, [...(byProject.get(entry.project) ?? []), ...entry.endpoints]));
+    const services: DiscoveredService[] = await Promise.all([...byProject.entries()].map(async ([name, candidates]) => {
+      const known = new Set<string>();
+      const endpoints = candidates.filter((endpoint) => {
+        const key = `${endpoint.method}:${endpoint.path}`;
+        if (known.has(key)) {
+          return false;
+        }
+        known.add(key);
+        return true;
+      }).sort((left, right) => left.group.localeCompare(right.group) || left.path.localeCompare(right.path));
+      const project = projects.find((item) => item.name === name);
+      return { id: name, name, endpoints, ...(project ? await this.projectBaseUrl(project.directory) : {}) };
+    }));
+    const endpoints = services.flatMap((service) => service.endpoints);
 
     return {
       source: "dotnet",
-      endpoints: endpoints.sort((left, right) => left.group.localeCompare(right.group) || left.path.localeCompare(right.path)),
+      endpoints,
+      services,
       warning: skippedLargeFiles ? `${skippedLargeFiles} archivos C# mayores de 2 MiB fueron omitidos.` : undefined
     };
+  }
+
+  private projectFor(file: vscode.Uri, projects: Array<{ name: string; directory: vscode.Uri }>): string {
+    const match = projects
+      .filter((project) => file.path.startsWith(`${project.directory.path}/`))
+      .sort((left, right) => right.directory.path.length - left.directory.path.length)[0];
+    return match?.name ?? "API local";
+  }
+
+  private async projectBaseUrl(directory: vscode.Uri): Promise<{ baseUrl?: string }> {
+    try {
+      const raw = Buffer.from(await vscode.workspace.fs.readFile(vscode.Uri.joinPath(directory, "Properties", "launchSettings.json"))).toString("utf8");
+      const parsed = JSON.parse(raw) as { profiles?: Record<string, { applicationUrl?: string }> };
+      const applicationUrl = Object.values(parsed.profiles ?? {})
+        .flatMap((profile) => profile.applicationUrl?.split(";") ?? [])
+        .map((url) => url.trim())
+        .find((url) => /^https?:\/\//i.test(url));
+      return applicationUrl ? { baseUrl: applicationUrl.replace(/\/$/, "") } : {};
+    } catch {
+      return {};
+    }
   }
 
   private async parseFile(uri: vscode.Uri): Promise<Endpoint[]> {
@@ -118,7 +157,7 @@ export class DotNetStaticStrategy implements IDiscoveryStrategy {
       id,
       name,
       method,
-      url: `{{apiUrl}}${templated}`,
+      url: templated,
       headers: [],
       params,
       body: "",

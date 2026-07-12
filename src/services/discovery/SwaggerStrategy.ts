@@ -101,7 +101,7 @@ export class SwaggerStrategy implements IDiscoveryStrategy {
           id,
           operation.summary ?? operation.operationId ?? `${method} ${path}`,
           method,
-          `{{apiUrl}}${route}`,
+          route,
           operation,
           operations.parameters ?? [],
           spec

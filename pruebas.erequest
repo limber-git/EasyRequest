@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "selectedEnvironmentId": "default",
   "environments": [
     {
@@ -11,210 +11,270 @@
       }
     }
   ],
-  "requests": [
-    {
-      "id": "request-1",
-      "name": "Nueva petición",
-      "method": "GET",
-      "url": "{{apiUrl}}/get",
-      "headers": [],
-      "params": [
-        {
-          "key": "apiUrl",
-          "value": "http://localhost:5025",
-          "enabled": true
-        }
-      ],
-      "body": "",
-      "bodyType": "none"
-    },
-    {
-      "id": "POST:/api/requests",
-      "name": "POST /api/requests",
-      "method": "POST",
-      "url": "{{apiUrl}}/api/requests",
-      "headers": [],
-      "params": [],
-      "body": "{\n  \"title\": \"string\",\n  \"description\": \"string\",\n  \"requestedBy\": \"string\"\n}",
-      "bodyType": "json"
-    },
-    {
-      "id": "GET:/api/requests/{id}",
-      "name": "GET /api/requests/{id}",
-      "method": "GET",
-      "url": "{{apiUrl}}/api/requests/{{id}}",
-      "headers": [],
-      "params": [
-        {
-          "key": "id",
-          "value": "2d3fb8cf-7eab-42b7-927e-fc8bb31e0s046",
-          "enabled": true,
-          "location": "path"
-        }
-      ],
-      "body": "",
-      "bodyType": "none"
-    },
-    {
-      "id": "PATCH:/api/requests/{id}/status",
-      "name": "PATCH /api/requests/{id}/status",
-      "method": "PATCH",
-      "url": "{{apiUrl}}/api/requests/{{id}}/status",
-      "headers": [],
-      "params": [
-        {
-          "key": "id",
-          "value": "01d5adee-d0bb-4c02-b9eb-333f30a2b06a",
-          "enabled": true,
-          "location": "path"
-        },
-        {
-          "key": "",
-          "value": "",
-          "enabled": true
-        }
-      ],
-      "body": "{\n  \"status\": \"Pending\"\n}",
-      "bodyType": "json"
-    },
-    {
-      "id": "101b181c-4e6e-45d8-8d0e-5e8b7d6a39a7",
-      "name": "Nueva petición",
-      "method": "GET",
-      "url": "",
-      "headers": [],
-      "params": [],
-      "body": "",
-      "bodyType": "none"
-    },
-    {
-      "id": "3462c235-91f8-4dff-b452-b8dddabff1c2",
-      "name": "Nueva petición",
-      "method": "GET",
-      "url": "",
-      "headers": [],
-      "params": [],
-      "body": "",
-      "bodyType": "none"
-    },
-    {
-      "id": "GET:/api/requests",
-      "name": "GetAll",
-      "method": "GET",
-      "url": "{{apiUrl}}/api/requests",
-      "headers": [],
-      "params": [],
-      "body": "",
-      "bodyType": "none",
-      "group": "ServiceRequests"
-    }
-  ],
-  "endpoints": [
-    {
-      "id": "GET:/",
-      "group": "Minimal APIs",
-      "name": "GET /",
-      "method": "GET",
-      "path": "/",
-      "request": {
-        "id": "GET:/",
-        "name": "GET /",
-        "method": "GET",
-        "url": "{{apiUrl}}/",
-        "headers": [],
-        "params": [],
-        "body": "",
-        "bodyType": "none",
-        "group": "Minimal APIs"
-      }
-    },
-    {
-      "id": "GET:/api/requests",
-      "group": "ServiceRequests",
-      "name": "GetAll",
-      "method": "GET",
-      "path": "/api/requests",
-      "request": {
-        "id": "GET:/api/requests",
-        "name": "GetAll",
-        "method": "GET",
-        "url": "{{apiUrl}}/api/requests",
-        "headers": [],
-        "params": [],
-        "body": "",
-        "bodyType": "none",
-        "group": "ServiceRequests"
-      }
-    },
-    {
-      "id": "POST:/api/requests",
-      "group": "ServiceRequests",
-      "name": "Create",
-      "method": "POST",
-      "path": "/api/requests",
-      "request": {
-        "id": "POST:/api/requests",
-        "name": "Create",
-        "method": "POST",
-        "url": "{{apiUrl}}/api/requests",
-        "headers": [],
-        "params": [],
-        "body": "",
-        "bodyType": "none",
-        "group": "ServiceRequests"
-      }
-    },
-    {
-      "id": "GET:/api/requests/{id:guid}",
-      "group": "ServiceRequests",
-      "name": "GetById",
-      "method": "GET",
-      "path": "/api/requests/{id:guid}",
-      "request": {
-        "id": "GET:/api/requests/{id:guid}",
-        "name": "GetById",
-        "method": "GET",
-        "url": "{{apiUrl}}/api/requests/{{id}}",
-        "headers": [],
-        "params": [
+  "root": {
+    "id": "root",
+    "type": "folder",
+    "name": "Colección",
+    "baseUrl": "{{apiUrl}}",
+    "children": [
+      {
+        "id": "manual",
+        "type": "folder",
+        "name": "Mis peticiones",
+        "children": [
           {
-            "key": "id",
-            "value": "",
-            "enabled": true,
-            "location": "path"
-          }
-        ],
-        "body": "",
-        "bodyType": "none",
-        "group": "ServiceRequests"
-      }
-    },
-    {
-      "id": "PATCH:/api/requests/{id:guid}/status",
-      "group": "ServiceRequests",
-      "name": "UpdateStatus",
-      "method": "PATCH",
-      "path": "/api/requests/{id:guid}/status",
-      "request": {
-        "id": "PATCH:/api/requests/{id:guid}/status",
-        "name": "UpdateStatus",
-        "method": "PATCH",
-        "url": "{{apiUrl}}/api/requests/{{id}}/status",
-        "headers": [],
-        "params": [
+            "id": "manual-0",
+            "type": "request",
+            "name": "Nueva petición",
+            "request": {
+              "id": "manual-0",
+              "name": "Nueva petición",
+              "method": "GET",
+              "url": "/get",
+              "headers": [],
+              "params": [
+                {
+                  "key": "apiUrl",
+                  "value": "http://localhost:5025",
+                  "enabled": true
+                }
+              ],
+              "body": "",
+              "bodyType": "none"
+            }
+          },
           {
-            "key": "id",
-            "value": "",
-            "enabled": true,
-            "location": "path"
+            "id": "manual-1",
+            "type": "request",
+            "name": "POST /api/requests",
+            "request": {
+              "id": "manual-1",
+              "name": "POST /api/requests",
+              "method": "POST",
+              "url": "/api/requests",
+              "headers": [],
+              "params": [],
+              "body": "{\n  \"title\": \"string\",\n  \"description\": \"string\",\n  \"requestedBy\": \"string\"\n}",
+              "bodyType": "json"
+            }
+          },
+          {
+            "id": "manual-2",
+            "type": "request",
+            "name": "GET /api/requests/{id}",
+            "request": {
+              "id": "manual-2",
+              "name": "GET /api/requests/{id}",
+              "method": "GET",
+              "url": "/api/requests/{{id}}",
+              "headers": [],
+              "params": [
+                {
+                  "key": "id",
+                  "value": "2d3fb8cf-7eab-42b7-927e-fc8bb31e0s046",
+                  "enabled": true,
+                  "location": "path"
+                }
+              ],
+              "body": "",
+              "bodyType": "none"
+            }
+          },
+          {
+            "id": "manual-3",
+            "type": "request",
+            "name": "PATCH /api/requests/{id}/status",
+            "request": {
+              "id": "manual-3",
+              "name": "PATCH /api/requests/{id}/status",
+              "method": "PATCH",
+              "url": "/api/requests/{{id}}/status",
+              "headers": [],
+              "params": [
+                {
+                  "key": "id",
+                  "value": "01d5adee-d0bb-4c02-b9eb-333f30a2b06a",
+                  "enabled": true,
+                  "location": "path"
+                },
+                {
+                  "key": "",
+                  "value": "",
+                  "enabled": true
+                }
+              ],
+              "body": "{\n  \"status\": \"Pending\"\n}",
+              "bodyType": "json"
+            }
+          },
+          {
+            "id": "manual-4",
+            "type": "request",
+            "name": "Nueva petición",
+            "request": {
+              "id": "manual-4",
+              "name": "Nueva petición",
+              "method": "GET",
+              "url": "/",
+              "headers": [],
+              "params": [],
+              "body": "",
+              "bodyType": "none"
+            }
+          },
+          {
+            "id": "manual-5",
+            "type": "request",
+            "name": "Nueva petición",
+            "request": {
+              "id": "manual-5",
+              "name": "Nueva petición",
+              "method": "GET",
+              "url": "/",
+              "headers": [],
+              "params": [],
+              "body": "",
+              "bodyType": "none"
+            }
+          },
+          {
+            "id": "manual-6",
+            "type": "request",
+            "name": "GetAll",
+            "request": {
+              "id": "manual-6",
+              "name": "GetAll",
+              "method": "GET",
+              "url": "/api/requests",
+              "headers": [],
+              "params": [],
+              "body": "",
+              "bodyType": "none",
+              "group": "ServiceRequests"
+            }
           }
-        ],
-        "body": "",
-        "bodyType": "none",
-        "group": "ServiceRequests"
+        ]
+      },
+      {
+        "id": "discovery",
+        "type": "folder",
+        "name": "Swagger",
+        "children": [
+          {
+            "id": "service-0",
+            "type": "folder",
+            "name": "API Swagger",
+            "baseUrl": "{{apiUrl}}",
+            "children": [
+              {
+                "id": "service-0-group-0",
+                "type": "folder",
+                "name": "Backendtest.Api",
+                "children": [
+                  {
+                    "id": "discovery-0-0",
+                    "type": "request",
+                    "name": "GET /",
+                    "request": {
+                      "id": "discovery-0-0",
+                      "name": "GET /",
+                      "method": "GET",
+                      "url": "/",
+                      "headers": [],
+                      "params": [],
+                      "body": "",
+                      "bodyType": "none"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "service-0-group-1",
+                "type": "folder",
+                "name": "ServiceRequests",
+                "children": [
+                  {
+                    "id": "discovery-0-1",
+                    "type": "request",
+                    "name": "GET /api/requests",
+                    "request": {
+                      "id": "discovery-0-1",
+                      "name": "GET /api/requests",
+                      "method": "GET",
+                      "url": "/api/requests",
+                      "headers": [],
+                      "params": [],
+                      "body": "",
+                      "bodyType": "none"
+                    }
+                  },
+                  {
+                    "id": "discovery-0-2",
+                    "type": "request",
+                    "name": "POST /api/requests",
+                    "request": {
+                      "id": "discovery-0-2",
+                      "name": "POST /api/requests",
+                      "method": "POST",
+                      "url": "/api/requests",
+                      "headers": [],
+                      "params": [],
+                      "body": "{\n  \"title\": \"string\",\n  \"description\": \"string\",\n  \"requestedBy\": \"string\"\n}",
+                      "bodyType": "json"
+                    }
+                  },
+                  {
+                    "id": "discovery-0-3",
+                    "type": "request",
+                    "name": "GET /api/requests/{id}",
+                    "request": {
+                      "id": "discovery-0-3",
+                      "name": "GET /api/requests/{id}",
+                      "method": "GET",
+                      "url": "/api/requests/{{id}}",
+                      "headers": [],
+                      "params": [
+                        {
+                          "key": "id",
+                          "value": "",
+                          "enabled": true,
+                          "location": "path"
+                        }
+                      ],
+                      "body": "",
+                      "bodyType": "none"
+                    }
+                  },
+                  {
+                    "id": "discovery-0-4",
+                    "type": "request",
+                    "name": "PATCH /api/requests/{id}/status",
+                    "request": {
+                      "id": "discovery-0-4",
+                      "name": "PATCH /api/requests/{id}/status",
+                      "method": "PATCH",
+                      "url": "/api/requests/{{id}}/status",
+                      "headers": [],
+                      "params": [
+                        {
+                          "key": "id",
+                          "value": "",
+                          "enabled": true,
+                          "location": "path"
+                        }
+                      ],
+                      "body": "{\n  \"status\": \"Pending\"\n}",
+                      "bodyType": "json"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
       }
-    }
-  ],
+    ]
+  },
   "swaggerUrl": "http://localhost:5025/swagger/v1/swagger.json",
-  "discoverySource": "dotnet"
+  "discoverySource": "swagger"
 }

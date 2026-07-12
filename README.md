@@ -49,7 +49,7 @@ Cada colección es un JSON con versión explícita. Este es un ejemplo mínimo:
 
 ```json
 {
-  "version": 1,
+  "version": 2,
   "selectedEnvironmentId": "local",
   "environments": [
     {
@@ -61,21 +61,43 @@ Cada colección es un JSON con versión explícita. Este es un ejemplo mínimo:
       }
     }
   ],
-  "requests": [
-    {
-      "id": "get-user",
-      "name": "Obtener usuario",
-      "method": "GET",
-      "url": "{{apiUrl}}/api/users/{{userId}}",
-      "headers": [],
-      "params": [],
-      "body": "",
-      "bodyType": "none"
-    }
-  ],
-  "endpoints": []
+  "root": {
+    "id": "root",
+    "type": "folder",
+    "name": "Colección",
+    "baseUrl": "{{apiUrl}}",
+    "children": [
+      {
+        "id": "users",
+        "type": "folder",
+        "name": "Usuarios",
+        "children": [
+          {
+            "id": "get-user",
+            "type": "request",
+            "name": "Obtener usuario",
+            "request": {
+              "id": "get-user",
+              "name": "Obtener usuario",
+              "method": "GET",
+              "url": "/api/users/{{userId}}",
+              "headers": [],
+              "params": [],
+              "body": "",
+              "bodyType": "none"
+            }
+          }
+        ]
+      }
+    ]
+  }
 }
 ```
+
+Las carpetas pueden contener otras carpetas y definir `baseUrl`. Una petición
+hereda la URL base más cercana; por ejemplo, un servicio dentro de una carpeta
+con `"baseUrl": "{{ordersApiUrl}}"` puede usar rutas relativas sin depender de
+la variable global `apiUrl`.
 
 Los cambios realizados en la interfaz se guardan directamente en el archivo.
 Marca una variable como **secreto** para guardar su valor en `SecretStorage`

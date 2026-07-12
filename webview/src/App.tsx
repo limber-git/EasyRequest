@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 import type { BatchResult, EasyRequestDocument, Environment, RequestSpec } from "../../src/types";
+import { findRequestNode, removeRequestNode, requestIds, updateRequestNode } from "../../src/services/CollectionTree";
 import { EndpointTree } from "./components/EndpointTree";
 import { EnvironmentEditor } from "./components/EnvironmentEditor";
 import { RequestPanel } from "./components/RequestPanel";
@@ -46,11 +47,21 @@ const isHostMessage = (value: unknown): value is HostMessage => {
 };
 
 const createInitialDocument = (): EasyRequestDocument => ({
-  version: 1,
+  version: 2,
   selectedEnvironmentId: "default",
   environments: [{ id: "default", name: "Default", variables: { apiUrl: "https://httpbin.org" } }],
-  requests: [{ id: "request-1", name: "Nueva petición", method: "GET", url: "{{apiUrl}}/get", headers: [], params: [], body: "", bodyType: "none" }],
-  endpoints: []
+  root: {
+    id: "root",
+    type: "folder",
+    name: "Colección",
+    baseUrl: "{{apiUrl}}",
+    children: [{
+      id: "request-1",
+      type: "request",
+      name: "Nueva petición",
+      request: { id: "request-1", name: "Nueva petición", method: "GET", url: "/get", headers: [], params: [], body: "", bodyType: "none" }
+    }]
+  }
 });
 
 const SPLITTER_WIDTH = 8;
@@ -79,7 +90,7 @@ export function App(): JSX.Element {
   const documentRef = useRef(document);
   const [activeRequestId, setActiveRequestId] = useState(() => {
     const restoredState = vscode.getState() as { activeRequestId?: unknown } | undefined;
-    return typeof restoredState?.activeRequestId === "string" ? restoredState.activeRequestId : document.requests[0].id;
+    return typeof restoredState?.activeRequestId === "string" ? restoredState.activeRequestId : requestIds(document.root)[0] ?? "";
   });
   const [batch, setBatch] = useState<BatchResult>();
   const [notice, setNotice] = useState<string>();
@@ -178,7 +189,7 @@ export function App(): JSX.Element {
     documentRef.current = next;
     setDocument(next);
     setLoadError(undefined);
-    setActiveRequestId((current) => next.requests.some((request) => request.id === current) ? current : next.requests[0]?.id ?? "");
+    setActiveRequestId((current) => findRequestNode(next.root, current) ? current : requestIds(next.root)[0] ?? "");
     setSwaggerUrl(next.swaggerUrl ?? "");
   };
 
@@ -305,28 +316,21 @@ export function App(): JSX.Element {
     vscode.setState({ activeRequestId });
   }, [activeRequestId, vscode]);
 
-  const activeRequest = document.requests.find((request) => request.id === activeRequestId) ?? document.requests[0];
-  const selectRequest = (request: RequestSpec, source: "collection" | "discovery") => {
-    setActiveRequestId(request.id);
-    if (source === "discovery") {
-      updateDocument((current) => ({
-        ...current,
-        requests: [...current.requests.filter((item) => item.id !== request.id), { ...request, headers: [...request.headers], params: [...request.params] }]
-      }));
-    }
-  };
+  const activeNode = findRequestNode(document.root, activeRequestId) ?? (requestIds(document.root)[0] ? findRequestNode(document.root, requestIds(document.root)[0]) : undefined);
+  const activeRequest = activeNode?.request;
+  const selectRequest = (id: string) => setActiveRequestId(id);
   const updateRequest = (request: RequestSpec) => {
-    updateDocument((current) => ({ ...current, requests: current.requests.map((item) => item.id === request.id ? request : item) }));
+    updateDocument((current) => ({ ...current, root: updateRequestNode(current.root, request.id, () => request) as typeof current.root }));
   };
   const newRequest = () => {
     const id = crypto.randomUUID();
-    const request: RequestSpec = { id, name: "Nueva petición", method: "GET", url: "", headers: [], params: [], body: "", bodyType: "none" };
+    const request: RequestSpec = { id, name: "Nueva petición", method: "GET", url: "/", headers: [], params: [], body: "", bodyType: "none" };
     setActiveRequestId(id);
-    updateDocument((current) => ({ ...current, requests: [...current.requests, request] }));
+    updateDocument((current) => ({ ...current, root: { ...current.root, children: [...current.root.children, { id, type: "request", name: request.name, request }] } }));
   };
   const deleteRequest = (id: string) => {
-    updateDocument((current) => ({ ...current, requests: current.requests.filter((request) => request.id !== id) }));
-    setActiveRequestId((current) => current === id ? documentRef.current.requests.find((request) => request.id !== id)?.id ?? "" : current);
+    updateDocument((current) => ({ ...current, root: removeRequestNode(current.root, id) }));
+    setActiveRequestId((current) => current === id ? requestIds(removeRequestNode(documentRef.current.root, id))[0] ?? "" : current);
   };
   const changeEnvironment = (environment: Environment) => {
     updateDocument((current) => ({
@@ -413,7 +417,7 @@ export function App(): JSX.Element {
           "--response-width": `${paneWidths.response}px`
         } as CSSProperties}
       >
-        <EndpointTree requests={document.requests} endpoints={document.endpoints} activeId={activeRequest?.id ?? ""} onSelect={selectRequest} onNew={newRequest} onDelete={deleteRequest} />
+        <EndpointTree root={document.root} activeId={activeRequest?.id ?? ""} onSelect={selectRequest} onNew={newRequest} onDelete={deleteRequest} />
         <div
           className="pane-splitter"
           role="separator"

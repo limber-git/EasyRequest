@@ -37,7 +37,7 @@ test("imports OpenAPI bodies from referenced schemas and uses apiUrl variables",
     const request = result.endpoints[0].request;
 
     assert.equal(result.baseUrl, "http://localhost:5025");
-    assert.equal(request.url, "{{apiUrl}}/api/requests");
+    assert.equal(request.url, "/api/requests");
     assert.equal(request.bodyType, "json");
     assert.deepEqual(JSON.parse(request.body), {
       title: "string",

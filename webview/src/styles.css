@@ -37,7 +37,8 @@ input:focus, select:focus { outline: 1px solid var(--vscode-focusBorder); outlin
 .endpoint-tree { background: var(--vscode-sideBar-background); }
 .pane-heading { display: flex; justify-content: space-between; align-items: center; min-height: 38px; padding: 0 12px; text-transform: uppercase; letter-spacing: .04em; font-size: .78em; font-weight: 700; color: var(--vscode-sideBarTitle-foreground, var(--vscode-foreground)); border-bottom: 1px solid var(--vscode-panel-border); }
 .tree-scroll { overflow: auto; padding: 5px 0 12px; }
-.tree-group { padding: 13px 12px 5px; color: var(--vscode-descriptionForeground); font-size: .82em; font-weight: 600; }
+.tree-group { width: 100%; display: flex; align-items: center; gap: 5px; padding: 8px 12px 5px; border: 0; color: var(--vscode-descriptionForeground); background: transparent; font-size: .82em; font-weight: 600; text-align: left; }
+.tree-group:hover { background: var(--vscode-list-hoverBackground); }.tree-chevron { display: inline-block; width: 10px; color: var(--vscode-descriptionForeground); transform: rotate(0deg); }.tree-chevron.collapsed { transform: rotate(-90deg); }
 .endpoint-item { width: 100%; display: flex; align-items: center; gap: 9px; padding: 6px 12px; border: 0; color: inherit; text-align: left; background: transparent; }
 .endpoint-row { display: flex; align-items: center; }
 .endpoint-row .endpoint-item { min-width: 0; flex: 1; }

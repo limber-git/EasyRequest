@@ -2,6 +2,7 @@ import { randomBytes } from "crypto";
 import * as vscode from "vscode";
 import { createDefaultDocument } from "../defaultDocument";
 import { CollectionSecrets } from "../services/CollectionSecrets";
+import { discoveredVariables, DiscoveredService, replaceDiscoveryFolder, requestWithContext } from "../services/CollectionTree";
 import { DiscoveryContext } from "../services/discovery/DiscoveryContext";
 import { DocumentCodec } from "../services/DocumentCodec";
 import { EnvResolver } from "../services/EnvResolver";
@@ -170,7 +171,7 @@ export class EasyRequestEditorProvider implements vscode.CustomTextEditorProvide
     message: Extract<WebviewMessage, { type: "executeRequest" }>
   ): Promise<void> {
     const document = this.codec.fromUnknown(message.document);
-    const request = document.requests.find((item) => item.id === message.requestId);
+    const request = requestWithContext(document.root, message.requestId);
     if (!request) {
       throw new Error("La petición seleccionada ya no existe.");
     }
@@ -211,12 +212,13 @@ export class EasyRequestEditorProvider implements vscode.CustomTextEditorProvide
     const result = await this.discovery.discover({
       swaggerUrl: swaggerUrl ?? document.swaggerUrl,
       workspaceRoot: this.workspaceRoot(textDocument.uri),
-      cachedEndpoints: document.endpoints
+      cachedEndpoints: []
     });
+    const services = this.servicesFor(result);
     const next = {
       ...document,
-      endpoints: result.endpoints,
-      environments: result.baseUrl ? this.setApiUrl(document, result.baseUrl) : document.environments,
+      root: replaceDiscoveryFolder(document.root, result.source, services),
+      environments: this.setBaseUrls(document, services),
       swaggerUrl: swaggerUrl?.trim() || document.swaggerUrl,
       discoverySource: result.source
     } satisfies EasyRequestDocument;
@@ -238,7 +240,13 @@ export class EasyRequestEditorProvider implements vscode.CustomTextEditorProvide
     }
     const document = await this.readHydratedDocument(textDocument);
     const result = await this.discovery.discoverDotNet(root);
-    const next = { ...document, endpoints: result.endpoints, discoverySource: result.source } satisfies EasyRequestDocument;
+    const services = this.servicesFor(result);
+    const next = {
+      ...document,
+      root: replaceDiscoveryFolder(document.root, result.source, services),
+      environments: this.setBaseUrls(document, services),
+      discoverySource: result.source
+    } satisfies EasyRequestDocument;
     await this.writeDocument(textDocument, next);
     await this.postDocument(webview, textDocument);
     this.post(webview, { type: "discoveryComplete", source: result.source, count: result.endpoints.length });
@@ -358,9 +366,22 @@ export class EasyRequestEditorProvider implements vscode.CustomTextEditorProvide
     return vscode.workspace.getWorkspaceFolder(documentUri)?.uri ?? vscode.workspace.workspaceFolders?.[0]?.uri;
   }
 
-  private setApiUrl(document: EasyRequestDocument, baseUrl: string): EasyRequestDocument["environments"] {
+  private servicesFor(result: { source: "swagger" | "dotnet" | "cache"; endpoints: import("../types").Endpoint[]; services?: DiscoveredService[]; baseUrl?: string }): DiscoveredService[] {
+    return result.services ?? [{
+      id: result.source,
+      name: result.source === "swagger" ? "API Swagger" : "API local",
+      baseUrl: result.baseUrl,
+      endpoints: result.endpoints
+    }];
+  }
+
+  private setBaseUrls(document: EasyRequestDocument, services: DiscoveredService[]): EasyRequestDocument["environments"] {
+    const variables = discoveredVariables(services);
+    if (!Object.keys(variables).length) {
+      return document.environments;
+    }
     return document.environments.map((environment) => environment.id === document.selectedEnvironmentId
-      ? { ...environment, variables: { ...environment.variables, apiUrl: baseUrl } }
+      ? { ...environment, variables: { ...environment.variables, ...variables } }
       : environment
     );
   }

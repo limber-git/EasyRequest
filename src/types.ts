@@ -37,12 +37,31 @@ export interface Endpoint {
   request: RequestSpec;
 }
 
+export interface CollectionFolder {
+  id: string;
+  type: "folder";
+  name: string;
+  /** A literal URL or an environment expression such as {{ordersApiUrl}}. */
+  baseUrl?: string;
+  children: CollectionNode[];
+}
+
+export interface CollectionRequest {
+  id: string;
+  type: "request";
+  name: string;
+  /** Overrides the base URL inherited from parent folders when supplied. */
+  baseUrl?: string;
+  request: RequestSpec;
+}
+
+export type CollectionNode = CollectionFolder | CollectionRequest;
+
 export interface EasyRequestDocument {
-  version: 1;
+  version: 2;
   selectedEnvironmentId: string;
   environments: Environment[];
-  requests: RequestSpec[];
-  endpoints: Endpoint[];
+  root: CollectionFolder;
   swaggerUrl?: string;
   discoverySource?: "swagger" | "dotnet" | "cache";
 }
