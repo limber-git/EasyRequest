@@ -105,7 +105,11 @@ export function EndpointTree(props: EndpointTreeProps): JSX.Element {
             onDrop={handleDrop}
           />
         ))}
-        {!root.children.length && <p className="empty-copy">La colección está vacía.</p>}
+        {!root.children.length && <div className="empty-copy">
+          <p>La colección está vacía.</p>
+          <p>Haz clic en <strong>+</strong> arriba para crear tu primera petición, o usa <strong>Sincronizar</strong> en la barra superior para importar desde Swagger/OpenAPI.</p>
+          <p style={{ marginTop: 8, fontSize: ".82em" }}><span className="kbd">Ctrl+P</span> Buscar · <span className="kbd">Ctrl+K</span> Ir a URL · <span className="kbd">F2</span> Renombrar</p>
+        </div>}
       </div>
     </aside>
   );

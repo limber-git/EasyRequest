@@ -33,7 +33,7 @@ export function AuthEditor({ request, onChange }: AuthEditorProps): JSX.Element 
           <option value="apikey">API key</option>
         </select>
       </Field>
-      {auth.type === "bearer" && <Field label="Token"><input value={auth.token} placeholder="{{accessToken}}" onChange={(event) => update({ token: event.target.value })} /></Field>}
+      {auth.type === "bearer" && <><Field label="Token"><input value={auth.token} placeholder="{{accessToken}}" onChange={(event) => update({ token: event.target.value })} /></Field><div className="auth-hint">Puedes usar variables de entorno: <code>{"{{nombre}}"}</code></div></>}
       {auth.type === "basic" && <><Field label="Usuario"><input value={auth.user} onChange={(event) => update({ user: event.target.value })} /></Field><Field label="Contraseña"><input type="password" value={auth.pass} onChange={(event) => update({ pass: event.target.value })} /></Field></>}
       {auth.type === "apikey" && <>
         <Field label="Nombre"><input value={auth.key} placeholder="X-API-Key" onChange={(event) => update({ key: event.target.value })} /></Field>

@@ -145,23 +145,44 @@ const ContractPanel: React.FC<ContractPanelProps> = ({
     return (
       <div className="contract-panel">
         <div className="contract-header">Contract Guardian</div>
+        <p style={{ color: "var(--vscode-descriptionForeground)", fontSize: ".85em", lineHeight: 1.5 }}>
+          Captura esta respuesta como contrato base. EasyRequest verificará automáticamente que las futuras respuestas cumplan con la estructura y valores esperados.
+        </p>
         <div className="contract-actions">
-          <button onClick={handleSave}>Guardar como contrato</button>
+          <button className="vscode-button primary" onClick={handleSave}>Guardar como contrato</button>
         </div>
       </div>
     );
   }
 
   // No contract and no result — nothing to show
-  if (!contract) return null;
+  if (!contract) {
+    return (
+      <div className="contract-panel">
+        <div className="contract-header">Contract Guardian</div>
+        <p style={{ color: "var(--vscode-descriptionForeground)", fontSize: ".85em", lineHeight: 1.5 }}>
+          Ejecuta la petición primero. Luego podrás capturar la respuesta como contrato base para validar futuras ejecuciones.
+        </p>
+      </div>
+    );
+  }
 
   // Contract exists
+  const validationResults = result ? contract.validations.map((v) => runValidation(v, result)) : [];
+  const passCount = validationResults.filter(Boolean).length;
+  const failCount = validationResults.filter((r) => r === false).length;
+
   return (
     <div className="contract-panel">
-      <div className="contract-header">Contract Guardian</div>
+      <div className="contract-header">
+        Contract Guardian
+        {result && <span style={{ fontWeight: 400, fontSize: ".88em" }}>
+          <span className="success">{passCount} ✓</span>{failCount > 0 && <>{" "}<span className="failure">{failCount} ✗</span></>}
+        </span>}
+      </div>
 
       {!result && (
-        <p style={{ color: "var(--vscode-descriptionForeground)" }}>
+        <p style={{ color: "var(--vscode-descriptionForeground)", fontSize: ".85em" }}>
           Ejecuta la petición para validar el contrato.
         </p>
       )}
@@ -186,7 +207,7 @@ const ContractPanel: React.FC<ContractPanelProps> = ({
       })}
 
       <div className="contract-actions">
-        <button onClick={onDeleteContract}>Eliminar contrato</button>
+        <button className="vscode-button secondary" onClick={onDeleteContract}>Eliminar contrato</button>
       </div>
     </div>
   );

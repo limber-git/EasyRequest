@@ -1,16 +1,25 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, useCallback, type ReactNode } from "react";
 import { VSCodeIcon } from "../icons/VSCodeIcon";
 
 export function ResponseBodyViewer({ body, onCopy }: { body: string; onCopy(text: string): void }): JSX.Element {
   const [search, setSearch] = useState("");
+  const [copied, setCopied] = useState(false);
   const formattedBody = useMemo(() => formatBody(body), [body]);
   const { highlighted, matchCount } = useMemo(() => highlight(formattedBody, search), [formattedBody, search]);
+
+  const handleCopy = useCallback(() => {
+    onCopy(body);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1800);
+  }, [body, onCopy]);
 
   return <>
     <div className="json-search">
       <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar en el body" aria-label="Buscar en el body" />
-      {search && <span className="json-search-count">{matchCount} coincidencias</span>}
-      <button className="copy-button" onClick={() => onCopy(body)} title="Copiar body" aria-label="Copiar body al portapapeles"><VSCodeIcon name="copy" /></button>
+      {search && <span className="json-search-count">{matchCount} coincidencia{matchCount !== 1 ? "s" : ""}</span>}
+      <button className="copy-button" onClick={handleCopy} title="Copiar body al portapapeles" aria-label="Copiar body al portapapeles">
+        {copied ? <><VSCodeIcon name="check" /> <span style={{ fontSize: ".82em" }}>Copiado</span></> : <VSCodeIcon name="copy" />}
+      </button>
     </div>
     <pre className="response-body" tabIndex={0} aria-label="Body de respuesta JSON">{highlighted}</pre>
   </>;

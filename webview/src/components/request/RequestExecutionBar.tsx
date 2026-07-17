@@ -20,7 +20,7 @@ export function RequestExecutionBar(props: RequestExecutionBarProps): JSX.Elemen
     <div className="request-line">
       <select className={`method-select method-${props.method.toLowerCase()}`} value={props.method} onChange={(event) => props.onChange({ method: event.target.value as HttpMethod })}>{methods.map((method) => <option value={method} key={method}>{method}</option>)}</select>
       <input className="url-input" value={props.url} placeholder="/api/recurso" onChange={(event) => props.onChange({ url: event.target.value })} />
-      {props.running ? <button className="vscode-button secondary" onClick={props.onCancel}>Cancelar</button> : <button className="vscode-button primary" disabled={props.disabled} onClick={props.onExecute}>Enviar</button>}
+      {props.running ? <button className="vscode-button secondary" onClick={props.onCancel} title="Cancelar petición (Esc)">Cancelar</button> : <button className="vscode-button primary" disabled={props.disabled} onClick={props.onExecute} title="Enviar petición (Ctrl+Enter)">Enviar</button>}
     </div>
     <div className="burst-row">
       <span>Ráfaga</span>

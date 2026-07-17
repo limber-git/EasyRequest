@@ -18,7 +18,7 @@ export function ResponsePanel({ batch, contract, requestId, onSaveContract, onDe
   const successCount = batch?.results.filter((result) => result.ok).length ?? 0;
   return <aside className="response-panel">
     <div className="pane-heading">Respuesta</div>
-    {!batch ? <div className="response-empty">Envía una petición para inspeccionar la respuesta y las métricas de la ráfaga.</div> : <>
+    {!batch ? <div className="response-empty"><p>Envía una petición para inspeccionar la respuesta.</p><p style={{ marginTop: 6, fontSize: ".85em" }}><span className="kbd">Ctrl+Enter</span> para enviar desde cualquier parte de la interfaz.</p></div> : <>
       <div className="batch-summary"><strong>{successCount}/{batch.results.length}</strong> correctas<span>{batch.totalDurationMs} ms total</span></div>
       <div className="batch-results" aria-label="Resultados de la ráfaga">{batch.results.map((result) => <button key={result.index} className={selected?.index === result.index ? "selected" : ""} onClick={() => setSelectedIndex(result.index)}><span>#{result.index + 1}</span><span className={`status ${result.ok ? "success" : "failure"}`}>{result.status ?? "ERR"}</span><span>{result.durationMs} ms</span></button>)}</div>
       <ResponseTabs active={tab} onSelect={setTab} />
