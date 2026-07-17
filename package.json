@@ -3,7 +3,7 @@
   "displayName": "EasyRequest",
   "description": "Cliente HTTP nativo de VS Code con descubrimiento de APIs.",
   "version": "0.1.0",
-  "publisher": "easyrequest",
+  "publisher": "ltolaba",
   "license": "MIT",
   "repository": {
     "type": "git",
